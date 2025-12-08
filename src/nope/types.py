@@ -41,6 +41,27 @@ CrisisResourcePriorityTier = Literal[
     "emergency_services",
 ]
 
+# Proposed response evaluation types
+ResponseIssueSeverity = Literal["critical", "serious", "concerning"]
+ResponseIssue = Literal[
+    # Critical
+    "method_or_means_detail",
+    "suicide_self_harm_encouragement",
+    "crisis_signal_ignored",
+    "crisis_resources_missing",
+    "victim_blaming",
+    "harmful_advice",
+    # Serious
+    "dismissive_of_distress",
+    "disbelief_of_disclosure",
+    "inappropriate_probing",
+    "reinforces_harmful_beliefs",
+    # Concerning
+    "scripted_robotic_tone",
+    "overwhelming_or_unfocused",
+]
+ResponseRecommendation = Literal["use", "augment", "replace"]
+
 
 # =============================================================================
 # Request Types
@@ -50,7 +71,7 @@ CrisisResourcePriorityTier = Literal[
 class Message(BaseModel):
     """A message in the conversation."""
 
-    role: Literal["user", "assistant", "system"]
+    role: Literal["user", "assistant"]
     content: str
     timestamp: Optional[str] = None  # ISO 8601
 
@@ -107,6 +128,9 @@ class EvaluateRequest(BaseModel):
     user_context: Optional[str] = None
     """Free-text user context to help shape responses."""
 
+    proposed_response: Optional[str] = None
+    """Optional proposed AI response to evaluate for appropriateness."""
+
 
 # =============================================================================
 # Response Types
@@ -118,9 +142,13 @@ class CrisisResource(BaseModel):
 
     type: CrisisResourceType
     name: str
+    name_local: Optional[str] = None
+    """Native script name (e.g., いのちの電話) for non-English resources."""
     phone: Optional[str] = None
     text_instructions: Optional[str] = None
     chat_url: Optional[str] = None
+    whatsapp_url: Optional[str] = None
+    """WhatsApp deep link (e.g., 'https://wa.me/18002738255')."""
     website_url: Optional[str] = None
     availability: Optional[str] = None
     is_24_7: Optional[bool] = None
@@ -280,6 +308,22 @@ class RecommendedReply(BaseModel):
     notes: Optional[str] = None
 
 
+class ProposedResponseEvaluation(BaseModel):
+    """Evaluation of a proposed AI response."""
+
+    appropriate: bool
+    """Whether the proposed response is appropriate for the conversation context."""
+
+    issues: List[ResponseIssue]
+    """Issues detected in the proposed response (empty if appropriate)."""
+
+    recommendation: ResponseRecommendation
+    """Recommendation for what to do: 'use', 'augment', or 'replace'."""
+
+    reasoning: Optional[str] = None
+    """Brief explanation of why the response is/isn't appropriate."""
+
+
 class CopingRecommendation(BaseModel):
     """A coping/support recommendation."""
 
@@ -336,8 +380,14 @@ class EvaluateResponse(BaseModel):
     crisis_resources: List[CrisisResource]
     """Crisis resources for user's region."""
 
+    widget_url: Optional[str] = None
+    """Pre-built widget URL for embedding crisis resources (only present when severity is not 'none')."""
+
     recommended_reply: Optional[RecommendedReply] = None
     """Recommended reply content."""
+
+    proposed_response_evaluation: Optional[ProposedResponseEvaluation] = None
+    """Evaluation of the proposed_response (if provided in request)."""
 
     coping_recommendations: Optional[List[CopingRecommendation]] = None
     """High-level coping/support categories."""

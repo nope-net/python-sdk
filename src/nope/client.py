@@ -89,6 +89,7 @@ class NopeClient:
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, dict]] = None,
         user_context: Optional[str] = None,
+        proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
         """
         Evaluate conversation messages for safety risks.
@@ -97,10 +98,11 @@ class NopeClient:
 
         Args:
             messages: List of conversation messages. Each message should have
-                'role' ('user', 'assistant', or 'system') and 'content'.
+                'role' ('user' or 'assistant') and 'content'.
             text: Plain text input (for free-form transcripts or session notes).
             config: Configuration options including user_country, locale, etc.
             user_context: Free-text context about the user to help shape responses.
+            proposed_response: Optional proposed AI response to evaluate for appropriateness.
 
         Returns:
             EvaluateResponse with domains, global assessment, crisis resources, etc.
@@ -155,6 +157,9 @@ class NopeClient:
 
         if user_context is not None:
             payload["user_context"] = user_context
+
+        if proposed_response is not None:
+            payload["proposed_response"] = proposed_response
 
         # Make request
         response = self._request("POST", "/v1/evaluate", json=payload)
@@ -320,6 +325,7 @@ class AsyncNopeClient:
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, dict]] = None,
         user_context: Optional[str] = None,
+        proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
         """
         Evaluate conversation messages for safety risks.
@@ -351,6 +357,9 @@ class AsyncNopeClient:
 
         if user_context is not None:
             payload["user_context"] = user_context
+
+        if proposed_response is not None:
+            payload["proposed_response"] = proposed_response
 
         response = await self._request("POST", "/v1/evaluate", json=payload)
 

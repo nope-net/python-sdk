@@ -41,6 +41,7 @@ from .types import (
     Message,
     OthersDomainAssessment,
     PresentationModifiers,
+    ProposedResponseEvaluation,
     ProtectiveFactorsInfo,
     RecommendedReply,
     SafeguardingFlags,
@@ -78,5 +79,6 @@ __all__ = [
     "SafeguardingFlags",
     "ProtectiveFactorsInfo",
     "RecommendedReply",
+    "ProposedResponseEvaluation",
     "CopingRecommendation",
 ]
