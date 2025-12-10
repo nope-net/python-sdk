@@ -20,7 +20,7 @@ def test_basic_evaluate():
 
     client = NopeClient(
         api_key=None,  # Local API doesn't require auth
-        base_url="http://localhost:8788"
+        base_url="http://localhost:3700"
     )
 
     try:
@@ -65,7 +65,7 @@ def test_text_input():
 
     client = NopeClient(
         api_key=None,
-        base_url="http://localhost:8788"
+        base_url="http://localhost:3700"
     )
 
     try:
@@ -93,7 +93,7 @@ def test_benign_content():
 
     client = NopeClient(
         api_key=None,
-        base_url="http://localhost:8788"
+        base_url="http://localhost:3700"
     )
 
     try:
@@ -127,7 +127,7 @@ def test_error_handling():
 
     client = NopeClient(
         api_key=None,
-        base_url="http://localhost:8788"
+        base_url="http://localhost:3700"
     )
 
     try:
@@ -166,7 +166,7 @@ async def test_async_client():
     try:
         async with AsyncNopeClient(
             api_key=None,
-            base_url="http://localhost:8788"
+            base_url="http://localhost:3700"
         ) as client:
             result = await client.evaluate(
                 messages=[{"role": "user", "content": "I'm having a tough day"}],
@@ -189,7 +189,7 @@ def test_response_fields():
 
     client = NopeClient(
         api_key=None,
-        base_url="http://localhost:8788"
+        base_url="http://localhost:3700"
     )
 
     try:
@@ -251,7 +251,7 @@ def main():
     """Run all integration tests."""
     print("=" * 60)
     print("NOPE Python SDK Integration Tests")
-    print("Testing against: http://localhost:8788")
+    print("Testing against: http://localhost:3700")
     print("=" * 60)
 
     results = []

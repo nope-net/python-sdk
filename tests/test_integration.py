@@ -4,7 +4,7 @@ Integration tests for NOPE Python SDK.
 Run with: pytest tests/test_integration.py -v
 
 Prerequisites:
-- Local API running at http://localhost:8788
+- Local API running at http://localhost:3700
 - Or set NOPE_API_URL environment variable
 """
 
@@ -20,7 +20,7 @@ from nope import (
 )
 
 # Skip all tests if API URL not configured
-API_URL = os.environ.get("NOPE_API_URL", "http://localhost:8788")
+API_URL = os.environ.get("NOPE_API_URL", "http://localhost:3700")
 SKIP_INTEGRATION = os.environ.get("SKIP_INTEGRATION_TESTS", "false").lower() == "true"
 
 pytestmark = pytest.mark.skipif(
