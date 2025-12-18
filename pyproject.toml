@@ -44,7 +44,7 @@ Documentation = "https://nope.net/docs"
 Repository = "https://github.com/nope-net/python-sdk"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nope"]
+packages = ["src/nope_net"]
 
 [tool.ruff]
 line-length = 100

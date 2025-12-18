@@ -11,7 +11,7 @@ Prerequisites:
 import os
 import pytest
 
-from nope import (
+from nope_net import (
     NopeClient,
     AsyncNopeClient,
     NopeAuthError,

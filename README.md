@@ -22,7 +22,7 @@ pip install nope-net
 ## Quick Start
 
 ```python
-from nope import NopeClient
+from nope_net import NopeClient
 
 # Get your API key from https://dashboard.nope.net
 client = NopeClient(api_key="nope_live_...")
@@ -36,26 +36,25 @@ result = client.evaluate(
     config={"user_country": "US"}
 )
 
-print(f"Severity: {result.global_.overall_severity}")  # e.g., "moderate", "high"
-print(f"Imminence: {result.global_.overall_imminence}")  # e.g., "subacute", "urgent"
+print(f"Severity: {result.summary.speaker_severity}")  # e.g., "moderate", "high"
+print(f"Imminence: {result.summary.speaker_imminence}")  # e.g., "subacute", "urgent"
 
 # Access crisis resources
 for resource in result.crisis_resources:
     print(f"  {resource.name}: {resource.phone}")
 ```
 
-> **Note:** The response uses `global_` (with underscore) because `global` is a reserved word in Python.
-
 ## Async Usage
 
 ```python
-from nope import AsyncNopeClient
+from nope_net import AsyncNopeClient
 
 async with AsyncNopeClient(api_key="nope_live_...") as client:
     result = await client.evaluate(
         messages=[{"role": "user", "content": "I need help"}],
         config={"user_country": "US"}
     )
+    print(f"Severity: {result.summary.speaker_severity}")
 ```
 
 ## Configuration
@@ -77,7 +76,6 @@ result = client.evaluate(
         "user_country": "US",           # ISO country code for crisis resources
         "locale": "en-US",              # Language/region
         "user_age_band": "adult",       # "adult", "minor", or "unknown"
-        "return_assistant_reply": True, # Include recommended safe reply
         "dry_run": False,               # If True, don't log or trigger webhooks
     },
     user_context="User has history of anxiety",  # Optional context
@@ -89,15 +87,21 @@ result = client.evaluate(
 ```python
 result = client.evaluate(messages=[...], config={"user_country": "US"})
 
-# Global assessment
-result.global_.overall_severity    # "none", "mild", "moderate", "high", "critical"
-result.global_.overall_imminence   # "not_applicable", "chronic", "subacute", "urgent", "emergency"
-result.global_.primary_concerns    # ["suicidal ideation", "self-harm"]
+# Summary (speaker-focused)
+result.summary.speaker_severity    # "none", "mild", "moderate", "high", "critical"
+result.summary.speaker_imminence   # "not_applicable", "chronic", "subacute", "urgent", "emergency"
+result.summary.any_third_party_risk  # bool
+result.summary.primary_concerns    # Narrative summary string
 
-# Domain-specific assessments
-for domain in result.domains:
-    print(f"{domain.domain}: {domain.severity} ({domain.imminence})")
-    print(f"  Risk features: {domain.risk_features}")
+# Communication style
+result.communication.styles        # [CommunicationStyleAssessment(style="direct", confidence=0.9), ...]
+result.communication.language      # "en"
+
+# Individual risks (subject + type)
+for risk in result.risks:
+    print(f"{risk.subject} {risk.type}: {risk.severity} ({risk.imminence})")
+    print(f"  Confidence: {risk.confidence}, Subject confidence: {risk.subject_confidence}")
+    print(f"  Features: {risk.features}")
 
 # Crisis resources (matched to user's country)
 for resource in result.crisis_resources:
@@ -113,14 +117,16 @@ if result.recommended_reply:
 
 # Legal/safeguarding flags
 if result.legal_flags:
-    if result.legal_flags.child_safeguarding:
-        print(f"Child safeguarding: {result.legal_flags.child_safeguarding.urgency}")
+    if result.legal_flags.ipv and result.legal_flags.ipv.indicated:
+        print(f"IPV detected - lethality: {result.legal_flags.ipv.lethality_risk}")
+    if result.legal_flags.mandatory_reporting and result.legal_flags.mandatory_reporting.indicated:
+        print(f"Mandatory reporting: {result.legal_flags.mandatory_reporting.context}")
 ```
 
 ## Error Handling
 
 ```python
-from nope import (
+from nope_net import (
     NopeClient,
     NopeAuthError,
     NopeRateLimitError,
@@ -156,16 +162,31 @@ result = client.evaluate(
 )
 ```
 
-## Risk Domains
+## Risk Taxonomy
 
-NOPE classifies risk across four domains:
+NOPE uses an orthogonal taxonomy separating WHO is at risk from WHAT type of harm:
 
-| Domain | Description |
-|--------|-------------|
-| `self` | Risk to self (suicide, self-harm, self-neglect) |
-| `others` | Risk to others (violence, threats) |
-| `dependent_at_risk` | Risk to dependents (child, vulnerable adult) |
-| `victimisation` | Being harmed by others (IPV, trafficking, abuse) |
+### Subjects (who is at risk)
+
+| Subject | Description |
+|---------|-------------|
+| `self` | The speaker is at risk |
+| `other` | Someone else is at risk (friend, family, stranger) |
+| `unknown` | Ambiguous - "asking for a friend" territory |
+
+### Risk Types (what type of harm)
+
+| Type | Description |
+|------|-------------|
+| `suicide` | Self-directed lethal intent |
+| `self_harm` | Non-suicidal self-injury (NSSI) |
+| `self_neglect` | Severe self-care failure |
+| `violence` | Harm directed at others |
+| `abuse` | Physical, emotional, sexual, financial abuse |
+| `sexual_violence` | Rape, sexual assault, coerced acts |
+| `neglect` | Failure to provide care for dependents |
+| `exploitation` | Trafficking, forced labor, sextortion |
+| `stalking` | Persistent unwanted contact/surveillance |
 
 ## Severity & Imminence
 
@@ -189,7 +210,7 @@ NOPE classifies risk across four domains:
 
 ## API Reference
 
-For full API documentation, see [nope.net/docs](https://nope.net/docs).
+For full API documentation, see [docs.nope.net](https://docs.nope.net).
 
 ## Versioning
 
@@ -205,6 +226,6 @@ MIT - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- Documentation: [nope.net/docs](https://nope.net/docs)
+- Documentation: [docs.nope.net](https://docs.nope.net)
 - Dashboard: [dashboard.nope.net](https://dashboard.nope.net)
 - Issues: [github.com/nope-net/python-sdk/issues](https://github.com/nope-net/python-sdk/issues)

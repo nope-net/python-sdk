@@ -6,7 +6,7 @@ and safeguarding risk.
 
 Example:
     ```python
-    from nope import NopeClient
+    from nope_net import NopeClient
 
     client = NopeClient(api_key="nope_live_...")
     result = client.evaluate(
@@ -14,7 +14,7 @@ Example:
         config={"user_country": "US"}
     )
 
-    print(f"Severity: {result.global_.overall_severity}")
+    print(f"Severity: {result.summary.speaker_severity}")
     for resource in result.crisis_resources:
         print(f"  {resource.name}: {resource.phone}")
     ```
@@ -30,23 +30,33 @@ from .errors import (
     NopeValidationError,
 )
 from .types import (
-    CopingRecommendation,
-    CrisisResource,
-    DependentAtRiskAssessment,
-    DomainAssessment,
-    EvaluateConfig,
-    EvaluateResponse,
-    GlobalAssessment,
-    LegalFlags,
+    # Request types
     Message,
-    OthersDomainAssessment,
-    PresentationModifiers,
-    ProposedResponseEvaluation,
+    EvaluateConfig,
+    EvaluateRequest,
+    # Core response types
+    EvaluateResponse,
+    Risk,
+    Summary,
+    CommunicationAssessment,
+    CommunicationStyleAssessment,
+    # Supporting types
+    CrisisResource,
+    LegalFlags,
+    IPVFlags,
+    MandatoryReportingFlags,
+    ThirdPartyThreatFlags,
     ProtectiveFactorsInfo,
+    FilterResult,
+    PreliminaryRisk,
     RecommendedReply,
-    SafeguardingFlags,
-    SelfDomainAssessment,
-    VictimisationAssessment,
+    ResponseMetadata,
+    # Utility functions
+    calculate_speaker_severity,
+    calculate_speaker_imminence,
+    has_third_party_risk,
+    SEVERITY_SCORES,
+    IMMINENCE_SCORES,
 )
 
 __version__ = "0.1.0"
@@ -65,20 +75,28 @@ __all__ = [
     # Request types
     "Message",
     "EvaluateConfig",
-    # Response types
+    "EvaluateRequest",
+    # Core response types
     "EvaluateResponse",
-    "GlobalAssessment",
-    "DomainAssessment",
-    "SelfDomainAssessment",
-    "OthersDomainAssessment",
-    "DependentAtRiskAssessment",
-    "VictimisationAssessment",
+    "Risk",
+    "Summary",
+    "CommunicationAssessment",
+    "CommunicationStyleAssessment",
+    # Supporting types
     "CrisisResource",
     "LegalFlags",
-    "PresentationModifiers",
-    "SafeguardingFlags",
+    "IPVFlags",
+    "MandatoryReportingFlags",
+    "ThirdPartyThreatFlags",
     "ProtectiveFactorsInfo",
+    "FilterResult",
+    "PreliminaryRisk",
     "RecommendedReply",
-    "ProposedResponseEvaluation",
-    "CopingRecommendation",
+    "ResponseMetadata",
+    # Utility functions
+    "calculate_speaker_severity",
+    "calculate_speaker_imminence",
+    "has_third_party_risk",
+    "SEVERITY_SCORES",
+    "IMMINENCE_SCORES",
 ]

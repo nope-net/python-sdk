@@ -32,7 +32,7 @@ class NopeClient:
             messages=[{"role": "user", "content": "I'm feeling down"}],
             config={"user_country": "US"}
         )
-        print(result.global_.overall_severity)
+        print(result.summary.speaker_severity)
         ```
     """
 
@@ -105,7 +105,7 @@ class NopeClient:
             proposed_response: Optional proposed AI response to evaluate for appropriateness.
 
         Returns:
-            EvaluateResponse with domains, global assessment, crisis resources, etc.
+            EvaluateResponse with risks, summary, communication, crisis resources, etc.
 
         Raises:
             NopeAuthError: Invalid or missing API key.
@@ -125,7 +125,7 @@ class NopeClient:
                 config={"user_country": "US"}
             )
 
-            if result.global_.overall_severity in ("high", "critical"):
+            if result.summary.speaker_severity in ("high", "critical"):
                 print("High risk detected")
                 for resource in result.crisis_resources:
                     print(f"  {resource.name}: {resource.phone}")
@@ -269,7 +269,7 @@ class AsyncNopeClient:
                 messages=[{"role": "user", "content": "I'm feeling down"}],
                 config={"user_country": "US"}
             )
-            print(result.global_.overall_severity)
+            print(result.summary.speaker_severity)
         ```
     """
 

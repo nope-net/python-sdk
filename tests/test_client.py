@@ -3,7 +3,7 @@
 import pytest
 from pytest_httpx import HTTPXMock
 
-from nope import (
+from nope_net import (
     AsyncNopeClient,
     NopeAuthError,
     NopeClient,
@@ -77,20 +77,26 @@ class TestNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
-                "domains": [
+                "communication": {
+                    "styles": [{"style": "direct", "confidence": 0.9}],
+                    "language": "en",
+                },
+                "risks": [
                     {
-                        "domain": "self",
-                        "self_subtype": "suicidal_or_self_injury",
+                        "subject": "self",
+                        "subject_confidence": 0.95,
+                        "type": "suicide",
                         "severity": "moderate",
                         "imminence": "subacute",
                         "confidence": 0.85,
-                        "risk_features": ["hopelessness", "passive ideation"],
+                        "features": ["hopelessness", "passive_ideation"],
                     }
                 ],
-                "global": {
-                    "overall_severity": "moderate",
-                    "overall_imminence": "subacute",
-                    "primary_concerns": ["suicidal ideation"],
+                "summary": {
+                    "speaker_severity": "moderate",
+                    "speaker_imminence": "subacute",
+                    "any_third_party_risk": False,
+                    "primary_concerns": "Suicidal ideation with passive thoughts",
                 },
                 "confidence": 0.85,
                 "crisis_resources": [
@@ -109,10 +115,11 @@ class TestNopeClient:
                 config={"user_country": "US"},
             )
 
-        assert result.global_.overall_severity == "moderate"
-        assert result.global_.overall_imminence == "subacute"
-        assert len(result.domains) == 1
-        assert result.domains[0].domain == "self"
+        assert result.summary.speaker_severity == "moderate"
+        assert result.summary.speaker_imminence == "subacute"
+        assert len(result.risks) == 1
+        assert result.risks[0].subject == "self"
+        assert result.risks[0].type == "suicide"
         assert len(result.crisis_resources) == 1
         assert result.crisis_resources[0].phone == "988"
 
@@ -122,11 +129,16 @@ class TestNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
-                "domains": [],
-                "global": {
-                    "overall_severity": "none",
-                    "overall_imminence": "not_applicable",
-                    "primary_concerns": [],
+                "communication": {
+                    "styles": [{"style": "clinical", "confidence": 0.8}],
+                    "language": "en",
+                },
+                "risks": [],
+                "summary": {
+                    "speaker_severity": "none",
+                    "speaker_imminence": "not_applicable",
+                    "any_third_party_risk": False,
+                    "primary_concerns": "No concerns identified",
                 },
                 "confidence": 0.95,
                 "crisis_resources": [],
@@ -136,7 +148,7 @@ class TestNopeClient:
         with NopeClient(api_key="test_key") as client:
             result = client.evaluate(text="Patient is doing well today.")
 
-        assert result.global_.overall_severity == "none"
+        assert result.summary.speaker_severity == "none"
 
     def test_auth_error(self, httpx_mock: HTTPXMock):
         """Should raise NopeAuthError on 401."""
@@ -223,11 +235,16 @@ class TestAsyncNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
-                "domains": [],
-                "global": {
-                    "overall_severity": "none",
-                    "overall_imminence": "not_applicable",
-                    "primary_concerns": [],
+                "communication": {
+                    "styles": [{"style": "direct", "confidence": 0.8}],
+                    "language": "en",
+                },
+                "risks": [],
+                "summary": {
+                    "speaker_severity": "none",
+                    "speaker_imminence": "not_applicable",
+                    "any_third_party_risk": False,
+                    "primary_concerns": "No concerns identified",
                 },
                 "confidence": 0.95,
                 "crisis_resources": [],
@@ -239,4 +256,4 @@ class TestAsyncNopeClient:
                 messages=[{"role": "user", "content": "Hello"}],
             )
 
-        assert result.global_.overall_severity == "none"
+        assert result.summary.speaker_severity == "none"
