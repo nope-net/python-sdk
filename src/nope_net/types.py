@@ -267,19 +267,23 @@ class IPVFlags(BaseModel):
     """Confidence in assessment."""
 
 
-class MandatoryReportingFlags(BaseModel):
+class SafeguardingConcernFlags(BaseModel):
     """
-    Mandatory reporting flags.
+    Safeguarding concern flags.
 
-    Surfaced for easy consumption - downstream systems can
-    take appropriate action based on jurisdiction.
+    Indicates patterns that may trigger statutory obligations depending on
+    jurisdiction and the platform's role. NOPE flags concerns; humans determine
+    whether mandatory reporting applies based on local law and organizational policy.
+
+    Note: AI systems are not mandatory reporters under any current statute.
+    This flag surfaces patterns for human review, not legal determinations.
     """
 
     indicated: bool
-    """Mandatory reporting likely indicated."""
+    """Safeguarding concern indicators present."""
 
     context: Literal["minor_involved", "vulnerable_adult", "csa", "infant_at_risk", "elder_abuse"]
-    """Context triggering the flag."""
+    """Context triggering the concern."""
 
 
 class ThirdPartyThreatFlags(BaseModel):
@@ -305,8 +309,8 @@ class LegalFlags(BaseModel):
     ipv: Optional[IPVFlags] = None
     """Intimate partner violence indicators."""
 
-    mandatory_reporting: Optional[MandatoryReportingFlags] = None
-    """Mandatory reporting indicators."""
+    safeguarding_concern: Optional[SafeguardingConcernFlags] = None
+    """Safeguarding concern indicators (patterns that may trigger statutory review)."""
 
     third_party_threat: Optional[ThirdPartyThreatFlags] = None
     """Third-party threat indicators."""
@@ -443,6 +447,114 @@ class EvaluateResponse(BaseModel):
 
     metadata: Optional[ResponseMetadata] = None
     """Metadata about the request/response."""
+
+
+# =============================================================================
+# Screen Types (for /v1/screen endpoint)
+# =============================================================================
+
+
+class ScreenCrisisResourcePrimary(BaseModel):
+    """Primary crisis resource (e.g., 988 Lifeline)."""
+
+    name: str
+    description: str
+    phone: str
+    text: str
+    chat_url: str
+    website_url: str
+    availability: str
+    languages: List[str]
+
+
+class ScreenCrisisResourceSecondary(BaseModel):
+    """Secondary crisis resource (e.g., Crisis Text Line)."""
+
+    name: str
+    description: str
+    text: str
+    sms_number: str
+    chat_url: str
+    website_url: str
+    availability: str
+    languages: List[str]
+
+
+class ScreenCrisisResources(BaseModel):
+    """Crisis resources returned by /v1/screen endpoint."""
+
+    primary: ScreenCrisisResourcePrimary
+    secondary: List[ScreenCrisisResourceSecondary]
+
+
+class ScreenDisplayText(BaseModel):
+    """Suggested display text for crisis resources."""
+
+    short: str
+    """Short message (e.g., "If you're in crisis, call or text 988")."""
+
+    detailed: str
+    """Detailed message with more context."""
+
+
+class ScreenDebugInfo(BaseModel):
+    """Debug information for /v1/screen (only if requested)."""
+
+    model: str
+    latency_ms: int
+    raw_response: Optional[str] = None
+
+
+class ScreenResponse(BaseModel):
+    """
+    Response from /v1/screen endpoint.
+
+    Lightweight crisis screening for SB243 compliance.
+    Uses C-SSRS framework for evidence-based severity assessment.
+    """
+
+    referral_required: bool
+    """Should crisis resources be shown?"""
+
+    crisis_type: Optional[Literal["suicidal_ideation", "self_harm"]]
+    """Type of crisis detected (null if none)."""
+
+    cssrs_level: int
+    """C-SSRS level (0-5) - evidence-based severity measure."""
+
+    self_harm_detected: bool
+    """Self-harm (NSSI) specifically detected."""
+
+    confidence: float
+    """Confidence in assessment (0-1)."""
+
+    rationale: str
+    """Brief rationale for assessment."""
+
+    resources: Optional[ScreenCrisisResources] = None
+    """Crisis resources to display (only when referral_required)."""
+
+    widget_url: Optional[str] = None
+    """Pre-built widget URL (only when referral_required)."""
+
+    display_text: Optional[ScreenDisplayText] = None
+    """Suggested display text (only when referral_required)."""
+
+    request_id: str
+    """Request ID for audit trail."""
+
+    timestamp: str
+    """ISO timestamp for audit trail."""
+
+    debug: Optional[ScreenDebugInfo] = None
+    """Debug info (only if requested)."""
+
+
+class ScreenConfig(BaseModel):
+    """Configuration for /v1/screen request."""
+
+    debug: Optional[bool] = None
+    """Include debug info (latency, raw response)."""
 
 
 # =============================================================================

@@ -16,7 +16,7 @@ from .errors import (
     NopeServerError,
     NopeValidationError,
 )
-from .types import EvaluateConfig, EvaluateResponse, Message
+from .types import EvaluateConfig, EvaluateResponse, Message, ScreenConfig, ScreenResponse
 
 
 class NopeClient:
@@ -165,6 +165,74 @@ class NopeClient:
         response = self._request("POST", "/v1/evaluate", json=payload)
 
         return EvaluateResponse.model_validate(response)
+
+    def screen(
+        self,
+        *,
+        messages: Optional[List[Union[Message, dict]]] = None,
+        text: Optional[str] = None,
+        config: Optional[Union[ScreenConfig, dict]] = None,
+    ) -> ScreenResponse:
+        """
+        Lightweight crisis screening for SB243/regulatory compliance.
+
+        Fast, cheap endpoint for detecting suicidal ideation and self-harm.
+        Uses C-SSRS framework for evidence-based severity assessment.
+
+        Either `messages` or `text` must be provided, but not both.
+
+        Args:
+            messages: List of conversation messages.
+            text: Plain text input (for free-form transcripts).
+            config: Configuration options (currently only debug flag).
+
+        Returns:
+            ScreenResponse with referral_required, cssrs_level, crisis_type, etc.
+
+        Raises:
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeRateLimitError: Rate limit exceeded.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.screen(text="I've been having dark thoughts lately")
+
+            if result.referral_required:
+                print(f"Crisis detected: {result.crisis_type}")
+                print(f"C-SSRS level: {result.cssrs_level}")
+                if result.resources:
+                    print(f"Call {result.resources.primary.phone}")
+            ```
+        """
+        if messages is None and text is None:
+            raise ValueError("Either 'messages' or 'text' must be provided")
+        if messages is not None and text is not None:
+            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
+
+        # Build request payload
+        payload: dict = {}
+
+        if messages is not None:
+            payload["messages"] = [
+                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
+            ]
+
+        if text is not None:
+            payload["text"] = text
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        # Make request
+        response = self._request("POST", "/v1/screen", json=payload)
+
+        return ScreenResponse.model_validate(response)
 
     def _request(
         self,
@@ -364,6 +432,43 @@ class AsyncNopeClient:
         response = await self._request("POST", "/v1/evaluate", json=payload)
 
         return EvaluateResponse.model_validate(response)
+
+    async def screen(
+        self,
+        *,
+        messages: Optional[List[Union[Message, dict]]] = None,
+        text: Optional[str] = None,
+        config: Optional[Union[ScreenConfig, dict]] = None,
+    ) -> ScreenResponse:
+        """
+        Lightweight crisis screening for SB243/regulatory compliance.
+
+        See NopeClient.screen for full documentation.
+        """
+        if messages is None and text is None:
+            raise ValueError("Either 'messages' or 'text' must be provided")
+        if messages is not None and text is not None:
+            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
+
+        payload: dict = {}
+
+        if messages is not None:
+            payload["messages"] = [
+                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
+            ]
+
+        if text is not None:
+            payload["text"] = text
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        response = await self._request("POST", "/v1/screen", json=payload)
+
+        return ScreenResponse.model_validate(response)
 
     async def _request(
         self,

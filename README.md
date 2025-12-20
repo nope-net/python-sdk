@@ -44,6 +44,22 @@ for resource in result.crisis_resources:
     print(f"  {resource.name}: {resource.phone}")
 ```
 
+## Crisis Screening (SB243 Compliance)
+
+For lightweight suicide/self-harm screening that satisfies California SB243 and similar regulations:
+
+```python
+result = client.screen(text="I've been having dark thoughts lately")
+
+if result.referral_required:
+    print(f"Crisis detected: {result.crisis_type}")  # "suicidal_ideation" or "self_harm"
+    print(f"C-SSRS level: {result.cssrs_level}")     # 0-5
+    if result.resources:
+        print(f"Call {result.resources.primary.phone}")
+```
+
+The `/v1/screen` endpoint is ~20x cheaper than `/v1/evaluate` and returns C-SSRS levels, pre-formatted crisis resources, and audit trail fields (`request_id`, `timestamp`).
+
 ## Async Usage
 
 ```python
@@ -119,8 +135,8 @@ if result.recommended_reply:
 if result.legal_flags:
     if result.legal_flags.ipv and result.legal_flags.ipv.indicated:
         print(f"IPV detected - lethality: {result.legal_flags.ipv.lethality_risk}")
-    if result.legal_flags.mandatory_reporting and result.legal_flags.mandatory_reporting.indicated:
-        print(f"Mandatory reporting: {result.legal_flags.mandatory_reporting.context}")
+    if result.legal_flags.safeguarding_concern and result.legal_flags.safeguarding_concern.indicated:
+        print(f"Safeguarding concern: {result.legal_flags.safeguarding_concern.context}")
 ```
 
 ## Error Handling
