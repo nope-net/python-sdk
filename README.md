@@ -178,6 +178,69 @@ result = client.evaluate(
 )
 ```
 
+## Webhook Verification
+
+If you've configured webhooks in the dashboard, use `Webhook.verify()` to validate incoming payloads:
+
+```python
+from nope_net import Webhook, WebhookPayload, WebhookSignatureError
+
+@app.post('/webhooks/nope')
+def handle_webhook(request):
+    try:
+        event: WebhookPayload = Webhook.verify(
+            payload=request.body,
+            signature=request.headers.get('x-nope-signature'),
+            timestamp=request.headers.get('x-nope-timestamp'),
+            secret=os.environ['NOPE_WEBHOOK_SECRET']
+        )
+
+        print(f"Received {event.event}: {event.risk_summary.overall_severity}")
+
+        # Handle the event
+        if event.event == 'risk.critical':
+            # Immediate escalation needed
+            pass
+        elif event.event == 'risk.elevated':
+            # Review recommended
+            pass
+
+        return {'status': 'ok'}, 200
+    except WebhookSignatureError as e:
+        print(f"Webhook verification failed: {e}")
+        return {'error': 'Invalid signature'}, 401
+```
+
+### Webhook Options
+
+```python
+event = Webhook.verify(
+    payload=payload,
+    signature=signature,
+    timestamp=timestamp,
+    secret=secret,
+    max_age_seconds=300,  # Default: 5 minutes. Set to 0 to disable timestamp checking.
+)
+```
+
+### Testing Webhooks
+
+Use `Webhook.sign()` to generate test signatures:
+
+```python
+payload = {"event": "test.ping", ...}
+result = Webhook.sign(payload, secret)
+
+# Use in test requests
+requests.post('/webhooks/nope',
+    json=payload,
+    headers={
+        'X-NOPE-Signature': result['signature'],
+        'X-NOPE-Timestamp': result['timestamp'],
+    }
+)
+```
+
 ## Risk Taxonomy
 
 NOPE uses an orthogonal taxonomy separating WHO is at risk from WHAT type of harm:

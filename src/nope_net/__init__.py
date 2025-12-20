@@ -66,6 +66,16 @@ from .types import (
     SEVERITY_SCORES,
     IMMINENCE_SCORES,
 )
+from .webhook import (
+    Webhook,
+    WebhookSignatureError,
+    WebhookPayload,
+    WebhookRiskSummary,
+    WebhookDomainAssessment,
+    WebhookFlags,
+    WebhookResourceProvided,
+    WebhookConversation,
+)
 
 __version__ = "0.1.0"
 
@@ -115,4 +125,13 @@ __all__ = [
     "has_third_party_risk",
     "SEVERITY_SCORES",
     "IMMINENCE_SCORES",
+    # Webhook verification
+    "Webhook",
+    "WebhookSignatureError",
+    "WebhookPayload",
+    "WebhookRiskSummary",
+    "WebhookDomainAssessment",
+    "WebhookFlags",
+    "WebhookResourceProvided",
+    "WebhookConversation",
 ]
