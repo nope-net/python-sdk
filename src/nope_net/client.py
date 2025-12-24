@@ -177,7 +177,8 @@ class NopeClient:
         Lightweight crisis screening for SB243/regulatory compliance.
 
         Fast, cheap endpoint for detecting suicidal ideation and self-harm.
-        Uses C-SSRS framework for evidence-based severity assessment.
+        Returns independent detection flags for suicidal ideation and self-harm,
+        tuned conservatively for regulatory compliance (SB243, NY Article 47).
 
         Either `messages` or `text` must be provided, but not both.
 
@@ -187,7 +188,7 @@ class NopeClient:
             config: Configuration options (currently only debug flag).
 
         Returns:
-            ScreenResponse with referral_required, cssrs_level, crisis_type, etc.
+            ScreenResponse with show_resources, suicidal_ideation, self_harm flags.
 
         Raises:
             NopeAuthError: Invalid or missing API key.
@@ -200,9 +201,9 @@ class NopeClient:
             ```python
             result = client.screen(text="I've been having dark thoughts lately")
 
-            if result.referral_required:
-                print(f"Crisis detected: {result.crisis_type}")
-                print(f"C-SSRS level: {result.cssrs_level}")
+            if result.show_resources:
+                print(f"SI: {result.suicidal_ideation}, SH: {result.self_harm}")
+                print(f"Rationale: {result.rationale}")
                 if result.resources:
                     print(f"Call {result.resources.primary.phone}")
             ```

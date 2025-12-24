@@ -509,36 +509,24 @@ class ScreenResponse(BaseModel):
     """
     Response from /v1/screen endpoint.
 
-    Lightweight crisis screening for SB243 compliance.
-    Uses C-SSRS framework for evidence-based severity assessment.
+    Lightweight crisis screening for regulatory compliance (SB243, NY Article 47).
+    Returns independent detection flags for suicidal ideation and self-harm.
     """
 
-    referral_required: bool
-    """Should crisis resources be shown?"""
+    show_resources: bool
+    """Should crisis resources be shown? True if suicidal_ideation or self_harm detected."""
 
-    crisis_type: Optional[Literal["suicidal_ideation", "self_harm"]]
-    """Type of crisis detected (null if none)."""
+    suicidal_ideation: bool
+    """Suicidal ideation detected (passive ideation, active ideation, or method/plan references)."""
 
-    cssrs_level: int
-    """C-SSRS level (0-5) - evidence-based severity measure."""
-
-    self_harm_detected: bool
-    """Self-harm (NSSI) specifically detected."""
-
-    confidence: float
-    """Confidence in assessment (0-1)."""
+    self_harm: bool
+    """Self-harm (NSSI) detected - tracked independently from suicidal ideation."""
 
     rationale: str
     """Brief rationale for assessment."""
 
     resources: Optional[ScreenCrisisResources] = None
-    """Crisis resources to display (only when referral_required)."""
-
-    widget_url: Optional[str] = None
-    """Pre-built widget URL (only when referral_required)."""
-
-    display_text: Optional[ScreenDisplayText] = None
-    """Suggested display text (only when referral_required)."""
+    """Crisis resources to display (only when show_resources is True)."""
 
     request_id: str
     """Request ID for audit trail."""
