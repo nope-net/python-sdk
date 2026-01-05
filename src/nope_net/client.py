@@ -45,6 +45,7 @@ class NopeClient:
         *,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        demo: bool = False,
     ):
         """
         Initialize the NOPE client.
@@ -54,10 +55,13 @@ class NopeClient:
                      Can be None for local development/testing without auth.
             base_url: Override the API base URL. Defaults to https://api.nope.net.
             timeout: Request timeout in seconds. Defaults to 30.
+            demo: Use demo/try endpoints that don't require authentication.
+                  These are rate-limited but useful for testing and evaluation.
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.demo = demo
 
         headers = {
             "Content-Type": "application/json",
@@ -162,7 +166,8 @@ class NopeClient:
             payload["proposed_response"] = proposed_response
 
         # Make request
-        response = self._request("POST", "/v1/evaluate", json=payload)
+        endpoint = "/v1/try/evaluate" if self.demo else "/v1/evaluate"
+        response = self._request("POST", endpoint, json=payload)
 
         return EvaluateResponse.model_validate(response)
 
@@ -231,7 +236,8 @@ class NopeClient:
                 payload["config"] = config.model_dump(exclude_none=True)
 
         # Make request
-        response = self._request("POST", "/v1/screen", json=payload)
+        endpoint = "/v1/try/screen" if self.demo else "/v1/screen"
+        response = self._request("POST", endpoint, json=payload)
 
         return ScreenResponse.model_validate(response)
 
@@ -351,6 +357,7 @@ class AsyncNopeClient:
         *,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        demo: bool = False,
     ):
         """
         Initialize the async NOPE client.
@@ -359,10 +366,12 @@ class AsyncNopeClient:
             api_key: Your NOPE API key. Can be None for local development/testing.
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
+            demo: Use demo/try endpoints that don't require authentication.
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout or self.DEFAULT_TIMEOUT
+        self.demo = demo
 
         headers = {
             "Content-Type": "application/json",
@@ -430,7 +439,8 @@ class AsyncNopeClient:
         if proposed_response is not None:
             payload["proposed_response"] = proposed_response
 
-        response = await self._request("POST", "/v1/evaluate", json=payload)
+        endpoint = "/v1/try/evaluate" if self.demo else "/v1/evaluate"
+        response = await self._request("POST", endpoint, json=payload)
 
         return EvaluateResponse.model_validate(response)
 
@@ -467,7 +477,8 @@ class AsyncNopeClient:
             else:
                 payload["config"] = config.model_dump(exclude_none=True)
 
-        response = await self._request("POST", "/v1/screen", json=payload)
+        endpoint = "/v1/try/screen" if self.demo else "/v1/screen"
+        response = await self._request("POST", endpoint, json=payload)
 
         return ScreenResponse.model_validate(response)
 

@@ -412,6 +412,8 @@ class ResponseMetadata(BaseModel):
 class EvaluateResponse(BaseModel):
     """Response from /v1/evaluate endpoint."""
 
+    model_config = {"extra": "allow"}  # Allow extra fields from API
+
     communication: CommunicationAssessment
     """Communication style analysis."""
 
@@ -457,27 +459,33 @@ class EvaluateResponse(BaseModel):
 class ScreenCrisisResourcePrimary(BaseModel):
     """Primary crisis resource (e.g., 988 Lifeline)."""
 
+    model_config = {"extra": "allow"}  # Allow extra fields from API
+
     name: str
-    description: str
-    phone: str
-    text: str
-    chat_url: str
-    website_url: str
-    availability: str
-    languages: List[str]
+    description: Optional[str] = None
+    phone: Optional[str] = None
+    text: Optional[str] = None  # API may return text_instructions instead
+    text_instructions: Optional[str] = None
+    chat_url: Optional[str] = None
+    website_url: Optional[str] = None
+    availability: Optional[str] = None
+    languages: Optional[List[str]] = None
 
 
 class ScreenCrisisResourceSecondary(BaseModel):
     """Secondary crisis resource (e.g., Crisis Text Line)."""
 
+    model_config = {"extra": "allow"}  # Allow extra fields from API
+
     name: str
-    description: str
-    text: str
-    sms_number: str
-    chat_url: str
-    website_url: str
-    availability: str
-    languages: List[str]
+    description: Optional[str] = None
+    text: Optional[str] = None  # API may return text_instructions instead
+    text_instructions: Optional[str] = None
+    sms_number: Optional[str] = None
+    chat_url: Optional[str] = None
+    website_url: Optional[str] = None
+    availability: Optional[str] = None
+    languages: Optional[List[str]] = None
 
 
 class ScreenCrisisResources(BaseModel):
@@ -512,6 +520,8 @@ class ScreenResponse(BaseModel):
     Lightweight crisis screening for regulatory compliance (SB243, NY Article 47).
     Returns independent detection flags for suicidal ideation and self-harm.
     """
+
+    model_config = {"extra": "allow"}  # Allow extra fields from API
 
     show_resources: bool
     """Should crisis resources be shown? True if suicidal_ideation or self_harm detected."""

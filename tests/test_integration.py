@@ -19,13 +19,14 @@ from nope_net import (
     EvaluateResponse,
 )
 
-# Skip all tests if API URL not configured
+# Run integration tests by default (assumes local API at localhost:3700)
+# Set SKIP_INTEGRATION=true to skip
 API_URL = os.environ.get("NOPE_API_URL", "http://localhost:3700")
-SKIP_INTEGRATION = os.environ.get("SKIP_INTEGRATION_TESTS", "false").lower() == "true"
+SKIP_INTEGRATION = os.environ.get("SKIP_INTEGRATION", "false").lower() == "true"
 
 pytestmark = pytest.mark.skipif(
     SKIP_INTEGRATION,
-    reason="Integration tests skipped (set SKIP_INTEGRATION_TESTS=false to run)"
+    reason="Integration tests skipped (set SKIP_INTEGRATION=false to run)"
 )
 
 
@@ -34,12 +35,12 @@ class TestNopeClientIntegration:
 
     @pytest.fixture
     def client(self):
-        """Create a client pointing to local API (no auth for local dev)."""
-        # Local API allows unauthenticated access for testing
+        """Create a client pointing to local API using demo mode."""
         return NopeClient(
-            api_key=None,  # No auth for local testing
+            api_key=None,
             base_url=API_URL,
             timeout=30.0,
+            demo=True,  # Use /v1/try/* endpoints (no auth required)
         )
 
     def test_evaluate_low_risk_message(self, client):
@@ -51,19 +52,19 @@ class TestNopeClientIntegration:
 
         # Verify response structure
         assert isinstance(result, EvaluateResponse)
-        assert result.global_ is not None
-        assert result.global_.overall_severity in ("none", "mild", "moderate", "high", "critical")
-        assert result.global_.overall_imminence in (
+        assert result.summary is not None
+        assert result.summary.speaker_severity in ("none", "mild", "moderate", "high", "critical")
+        assert result.summary.speaker_imminence in (
             "not_applicable", "chronic", "subacute", "urgent", "emergency"
         )
         assert isinstance(result.confidence, float)
         assert 0.0 <= result.confidence <= 1.0
         assert isinstance(result.crisis_resources, list)
-        assert isinstance(result.domains, list)
+        assert isinstance(result.risks, list)
 
         # Low-risk message should have none/mild severity
-        print(f"Severity: {result.global_.overall_severity}")
-        print(f"Imminence: {result.global_.overall_imminence}")
+        print(f"Severity: {result.summary.speaker_severity}")
+        print(f"Imminence: {result.summary.speaker_imminence}")
         print(f"Confidence: {result.confidence}")
 
     def test_evaluate_moderate_risk_message(self, client):
@@ -78,12 +79,12 @@ class TestNopeClientIntegration:
         )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Severity: {result.global_.overall_severity}")
-        print(f"Imminence: {result.global_.overall_imminence}")
-        print(f"Primary concerns: {result.global_.primary_concerns}")
+        print(f"Severity: {result.summary.speaker_severity}")
+        print(f"Imminence: {result.summary.speaker_imminence}")
+        print(f"Primary concerns: {result.summary.primary_concerns}")
 
         # Should have crisis resources for US
-        if result.global_.overall_severity not in ("none",):
+        if result.summary.speaker_severity not in ("none",):
             print(f"Crisis resources: {len(result.crisis_resources)}")
             for resource in result.crisis_resources[:2]:
                 print(f"  - {resource.name}: {resource.phone}")
@@ -96,28 +97,28 @@ class TestNopeClientIntegration:
         )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Text input - Severity: {result.global_.overall_severity}")
+        print(f"Text input - Severity: {result.summary.speaker_severity}")
 
-    def test_evaluate_domain_assessments(self, client):
-        """Test that domain assessments are properly parsed."""
+    def test_evaluate_risk_assessments(self, client):
+        """Test that risk assessments are properly parsed."""
         result = client.evaluate(
             messages=[{"role": "user", "content": "I feel so overwhelmed and anxious"}],
             config={"user_country": "US"},
         )
 
-        # Check domain structure
-        for domain in result.domains:
-            print(f"Domain: {domain.domain}")
-            print(f"  Severity: {domain.severity}")
-            print(f"  Imminence: {domain.imminence}")
-            print(f"  Risk features: {domain.risk_features}")
+        # Check risk structure
+        for risk in result.risks:
+            print(f"Risk type: {risk.type} (subject: {risk.subject})")
+            print(f"  Severity: {risk.severity}")
+            print(f"  Imminence: {risk.imminence}")
+            print(f"  Features: {risk.features}")
 
             # Verify required fields
-            assert domain.severity in ("none", "mild", "moderate", "high", "critical")
-            assert domain.imminence in (
+            assert risk.severity in ("none", "mild", "moderate", "high", "critical")
+            assert risk.imminence in (
                 "not_applicable", "chronic", "subacute", "urgent", "emergency"
             )
-            assert isinstance(domain.risk_features, list)
+            assert isinstance(risk.features, list)
 
     def test_evaluate_different_countries(self, client):
         """Test that different countries return appropriate resources."""
@@ -138,11 +139,12 @@ class TestAsyncNopeClientIntegration:
 
     @pytest.fixture
     def client(self):
-        """Create an async client."""
+        """Create an async client using demo mode."""
         return AsyncNopeClient(
-            api_key=None,  # No auth for local testing
+            api_key=None,
             base_url=API_URL,
             timeout=30.0,
+            demo=True,  # Use /v1/try/* endpoints (no auth required)
         )
 
     @pytest.mark.asyncio
@@ -155,7 +157,64 @@ class TestAsyncNopeClientIntegration:
             )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Async - Severity: {result.global_.overall_severity}")
+        print(f"Async - Severity: {result.summary.speaker_severity}")
+
+
+class TestScreenIntegration:
+    """Integration tests for screen endpoint."""
+
+    @pytest.fixture
+    def client(self):
+        """Create a client using demo mode."""
+        return NopeClient(
+            api_key=None,
+            base_url=API_URL,
+            timeout=30.0,
+            demo=True,  # Use /v1/try/* endpoints (no auth required)
+        )
+
+    def test_screen_low_risk_message(self, client):
+        """Test screening a low-risk message."""
+        result = client.screen(
+            messages=[{"role": "user", "content": "Hello, how are you?"}],
+        )
+
+        assert hasattr(result, "suicidal_ideation")
+        assert hasattr(result, "self_harm")
+        assert hasattr(result, "show_resources")
+        assert isinstance(result.suicidal_ideation, bool)
+        assert isinstance(result.self_harm, bool)
+        assert isinstance(result.show_resources, bool)
+
+        print(f"Screen - Suicidal ideation: {result.suicidal_ideation}")
+        print(f"Screen - Self harm: {result.self_harm}")
+        print(f"Screen - Show resources: {result.show_resources}")
+
+    def test_screen_concerning_message(self, client):
+        """Test screening a concerning message."""
+        result = client.screen(
+            messages=[{"role": "user", "content": "I don't want to be here anymore"}],
+            config={"user_country": "US"},
+        )
+
+        assert result.show_resources is True
+
+        print(f"Screen concerning - Suicidal ideation: {result.suicidal_ideation}")
+        print(f"Screen concerning - Show resources: {result.show_resources}")
+
+        if result.show_resources and result.resources:
+            assert result.resources.primary is not None
+            print(f"Screen concerning - Primary resource: {result.resources.primary.name}")
+
+    def test_screen_with_text_input(self, client):
+        """Test screening plain text input."""
+        result = client.screen(
+            text="I feel hopeless and alone",
+            config={"user_country": "US"},
+        )
+
+        assert isinstance(result.suicidal_ideation, bool)
+        print(f"Screen text - Show resources: {result.show_resources}")
 
 
 class TestErrorHandling:
@@ -180,51 +239,3 @@ class TestErrorHandling:
         except NopeAuthError as e:
             print(f"Auth error (expected): {e}")
             assert e.status_code == 401
-
-
-if __name__ == "__main__":
-    # Run basic test manually
-    print(f"Testing against: {API_URL}")
-
-    client = NopeClient(
-        api_key=None,  # No auth for local testing
-        base_url=API_URL,
-    )
-
-    print("\n--- Test 1: Low risk message ---")
-    try:
-        result = client.evaluate(
-            messages=[{"role": "user", "content": "Hello, how are you?"}],
-            config={"user_country": "US"},
-        )
-        print(f"Success! Severity: {result.global_.overall_severity}")
-        print(f"Domains: {len(result.domains)}")
-        print(f"Resources: {len(result.crisis_resources)}")
-    except Exception as e:
-        print(f"Error: {type(e).__name__}: {e}")
-
-    print("\n--- Test 2: Moderate risk message ---")
-    try:
-        result = client.evaluate(
-            messages=[
-                {"role": "user", "content": "I've been feeling really hopeless lately"},
-            ],
-            config={"user_country": "US"},
-        )
-        print(f"Success! Severity: {result.global_.overall_severity}")
-        print(f"Imminence: {result.global_.overall_imminence}")
-        print(f"Concerns: {result.global_.primary_concerns}")
-        if result.crisis_resources:
-            print(f"First resource: {result.crisis_resources[0].name}")
-    except Exception as e:
-        print(f"Error: {type(e).__name__}: {e}")
-
-    print("\n--- Test 3: Text input ---")
-    try:
-        result = client.evaluate(
-            text="Patient reports feeling overwhelmed.",
-            config={"user_country": "GB"},
-        )
-        print(f"Success! Severity: {result.global_.overall_severity}")
-    except Exception as e:
-        print(f"Error: {type(e).__name__}: {e}")
