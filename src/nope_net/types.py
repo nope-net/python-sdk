@@ -620,3 +620,339 @@ def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
 def has_third_party_risk(risks: List[Risk]) -> bool:
     """Check if any third-party risk exists."""
     return any(r.subject == "other" and r.subject_confidence > 0.5 for r in risks)
+
+
+# =============================================================================
+# Oversight Types (for /v1/oversight/* endpoints)
+# =============================================================================
+
+# Concern level for AI behavior analysis
+ConcernLevel = Literal["none", "low", "medium", "high", "critical"]
+
+# Trajectory of concern within a conversation
+Trajectory = Literal["improving", "stable", "worsening"]
+
+# Behavior severity in Oversight analysis
+OversightSeverity = Literal["low", "medium", "high", "critical"]
+
+# Human indicator types observed in conversation
+HumanIndicatorType = Literal[
+    "distress_markers", "acquiescence", "disengagement", "escalation", "pushback"
+]
+
+# Analysis strategy
+OversightAnalysisStrategy = Literal["single", "sliding"]
+
+
+class OversightMessage(BaseModel):
+    """A message in an Oversight conversation."""
+
+    model_config = {"extra": "allow"}
+
+    role: Literal["user", "assistant", "system"]
+    """Message role."""
+
+    content: str
+    """Message content."""
+
+    message_id: Optional[str] = None
+    """Customer-provided unique identifier for this message/turn."""
+
+    timestamp: Optional[str] = None
+    """When this message was sent (ISO 8601)."""
+
+    agent_id: Optional[str] = None
+    """Agent/bot identifier that generated this message (for assistant messages)."""
+
+    agent_version: Optional[str] = None
+    """Agent version string."""
+
+    context: Optional[str] = None
+    """Retrieved RAG/memory context that informed this response."""
+
+
+class OversightConversationMetadata(BaseModel):
+    """Metadata about an Oversight conversation."""
+
+    model_config = {"extra": "allow"}
+
+    user_id_hash: Optional[str] = None
+    """Hashed identifier for the end-user (for cross-session trajectory tracking)."""
+
+    session_id: Optional[str] = None
+    """Customer's session identifier."""
+
+    session_number: Optional[int] = None
+    """Session number for this user (1, 2, 3...)."""
+
+    user_is_minor: Optional[bool] = None
+    """Whether the end-user is a minor (escalates all severity levels)."""
+
+    user_age_bracket: Optional[Literal["child", "teen", "adult", "unknown"]] = None
+    """Age bracket of the end-user."""
+
+    platform: Optional[str] = None
+    """Platform where conversation occurred (e.g., "ios", "web", "discord")."""
+
+    product: Optional[str] = None
+    """Product/bot name."""
+
+    started_at: Optional[str] = None
+    """When the conversation started (ISO 8601)."""
+
+    ended_at: Optional[str] = None
+    """When the conversation ended (ISO 8601)."""
+
+    tags: Optional[List[str]] = None
+    """Customer-defined tags for categorization."""
+
+
+class OversightConversation(BaseModel):
+    """A conversation to analyze with Oversight."""
+
+    model_config = {"extra": "allow"}
+
+    conversation_id: Optional[str] = None
+    """Unique identifier for the conversation."""
+
+    messages: List[OversightMessage]
+    """Messages in the conversation."""
+
+    metadata: Optional[OversightConversationMetadata] = None
+    """Optional metadata about the conversation."""
+
+
+class DetectedBehavior(BaseModel):
+    """A detected behavior in the conversation."""
+
+    model_config = {"extra": "allow"}
+
+    code: str
+    """Behavior code (e.g., 'validation_of_suicidal_ideation', 'romantic_escalation')."""
+
+    severity: OversightSeverity
+    """Severity of this behavior instance."""
+
+    turn_number: int
+    """Turn number where behavior was detected (0-indexed)."""
+
+    evidence: str
+    """Evidence quote from the conversation."""
+
+    reasoning: str
+    """Reasoning for why this behavior was flagged."""
+
+
+class AggregatedBehavior(BaseModel):
+    """Aggregated behavior for summary (multiple instances collapsed)."""
+
+    model_config = {"extra": "allow"}
+
+    code: str
+    """Behavior code."""
+
+    severity: OversightSeverity
+    """Highest severity across instances."""
+
+    turn_count: int
+    """Number of turns where this behavior appeared."""
+
+
+class TurnAnalysis(BaseModel):
+    """Turn-level analysis."""
+
+    model_config = {"extra": "allow"}
+
+    turn_number: int
+    """Turn number (0-indexed)."""
+
+    role: Literal["assistant"] = "assistant"
+    """Role of this turn (always 'assistant' for analysis)."""
+
+    content_summary: str
+    """Brief summary of turn content."""
+
+    behaviors: List[DetectedBehavior]
+    """Behaviors detected in this turn."""
+
+    missed_intervention: bool
+    """Whether AI missed an opportunity to intervene."""
+
+
+class HumanIndicator(BaseModel):
+    """Human response indicator."""
+
+    model_config = {"extra": "allow"}
+
+    type: HumanIndicatorType
+    """Type of indicator."""
+
+    observation: str
+    """What was observed."""
+
+    turns: List[int]
+    """Turn numbers where this was observed."""
+
+
+class OversightAnalysisResult(BaseModel):
+    """Result from Oversight analysis."""
+
+    model_config = {"extra": "allow", "protected_namespaces": ()}
+
+    conversation_id: str
+    """Conversation identifier."""
+
+    analyzed_at: str
+    """When analysis was performed (ISO 8601)."""
+
+    conversation_summary: str
+    """Brief summary of the conversation."""
+
+    overall_concern: ConcernLevel
+    """Overall concern level."""
+
+    trajectory: Trajectory
+    """Trajectory of concern within the conversation."""
+
+    summary: str
+    """Human-readable summary of findings."""
+
+    turn_analysis: List[TurnAnalysis]
+    """Turn-by-turn analysis (assistant turns only)."""
+
+    human_indicators: List[HumanIndicator]
+    """Human response indicators observed."""
+
+    pattern_assessment: str
+    """Pattern assessment narrative."""
+
+    detected_behaviors: List[AggregatedBehavior]
+    """Aggregated behaviors (deduplicated across turns)."""
+
+    model_used: str
+    """Model used for analysis."""
+
+    latency_ms: Optional[int] = None
+    """Analysis latency in milliseconds."""
+
+    prompt_tokens: Optional[int] = None
+    """Prompt tokens used."""
+
+    completion_tokens: Optional[int] = None
+    """Completion tokens used."""
+
+    raw_xml: Optional[str] = None
+    """Raw XML output (only if requested)."""
+
+
+class OversightAnalyzeConfig(BaseModel):
+    """Configuration for Oversight analyze request."""
+
+    strategy: Optional[OversightAnalysisStrategy] = None
+    """Force a specific analysis strategy. If None, auto-selects based on conversation length."""
+
+    include_raw_xml: Optional[bool] = None
+    """Include raw XML in response (for debugging)."""
+
+    model: Optional[str] = None
+    """Custom model to use."""
+
+
+class OversightAnalyzeResponse(BaseModel):
+    """Response from /v1/oversight/analyze."""
+
+    model_config = {"extra": "allow"}
+
+    result: OversightAnalysisResult
+    """Analysis result."""
+
+    strategy: Optional[OversightAnalysisStrategy] = None
+    """Which strategy was used (authenticated endpoint)."""
+
+    strategy_reason: Optional[str] = None
+    """Why this strategy was chosen (authenticated endpoint)."""
+
+    mode: Optional[Literal["single", "windowed"]] = None
+    """Analysis mode (demo endpoint)."""
+
+    try_endpoint: Optional[bool] = None
+    """Whether this came from try endpoint."""
+
+
+class OversightIngestConfig(BaseModel):
+    """Configuration for Oversight ingest request."""
+
+    model: Optional[str] = None
+    """Custom model to use."""
+
+
+class TruncationWarning(BaseModel):
+    """Truncation warning from ingest."""
+
+    model_config = {"extra": "allow"}
+
+    type: str
+    """Warning type."""
+
+    message: str
+    """Warning message."""
+
+
+class OversightIngestConversationResult(BaseModel):
+    """Per-conversation result from ingest."""
+
+    model_config = {"extra": "allow"}
+
+    conversation_id: str
+    """Conversation ID."""
+
+    overall_concern: ConcernLevel
+    """Overall concern level."""
+
+    behaviors_detected: int
+    """Number of behaviors detected."""
+
+    truncation_warnings: Optional[List[TruncationWarning]] = None
+    """Truncation warnings if conversation was modified."""
+
+
+class OversightIngestError(BaseModel):
+    """Per-conversation error from ingest."""
+
+    model_config = {"extra": "allow"}
+
+    conversation_id: str
+    """Conversation ID."""
+
+    error: str
+    """Error message."""
+
+
+class OversightIngestResponse(BaseModel):
+    """Response from /v1/oversight/ingest."""
+
+    model_config = {"extra": "allow"}
+
+    ingestion_id: str
+    """Unique ingestion ID for tracking."""
+
+    status: Literal["queued", "processing", "complete", "failed"]
+    """Current status."""
+
+    conversations_received: int
+    """Number of conversations received."""
+
+    conversations_processed: int
+    """Number of conversations successfully processed."""
+
+    estimated_completion: Optional[str] = None
+    """Estimated completion time (ISO 8601)."""
+
+    dashboard_url: str
+    """URL to view results in dashboard."""
+
+    results: Optional[List[OversightIngestConversationResult]] = None
+    """Per-conversation results (if complete)."""
+
+    errors: Optional[List[OversightIngestError]] = None
+    """Per-conversation errors (if any)."""

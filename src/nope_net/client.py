@@ -12,11 +12,24 @@ from .errors import (
     NopeAuthError,
     NopeConnectionError,
     NopeError,
+    NopeFeatureError,
     NopeRateLimitError,
     NopeServerError,
     NopeValidationError,
 )
-from .types import EvaluateConfig, EvaluateResponse, Message, ScreenConfig, ScreenResponse
+from .types import (
+    EvaluateConfig,
+    EvaluateResponse,
+    Message,
+    OversightAnalyzeConfig,
+    OversightAnalyzeResponse,
+    OversightConversation,
+    OversightIngestConfig,
+    OversightIngestResponse,
+    OversightMessage,
+    ScreenConfig,
+    ScreenResponse,
+)
 
 
 class NopeClient:
@@ -241,6 +254,179 @@ class NopeClient:
 
         return ScreenResponse.model_validate(response)
 
+    def oversight_analyze(
+        self,
+        *,
+        conversation: Union[OversightConversation, dict],
+        config: Optional[Union[OversightAnalyzeConfig, dict]] = None,
+    ) -> OversightAnalyzeResponse:
+        """
+        Analyze a single conversation for harmful AI behaviors.
+
+        This endpoint performs synchronous analysis and returns results directly.
+        Does NOT store results to database - use `oversight_ingest` for persistent storage.
+
+        Args:
+            conversation: The conversation to analyze.
+            config: Configuration options (strategy, model, etc.).
+
+        Returns:
+            OversightAnalyzeResponse with analysis result, strategy, and reason.
+
+        Raises:
+            NopeFeatureError: Oversight feature not enabled for this account.
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.oversight_analyze(
+                conversation={
+                    "conversation_id": "conv_123",
+                    "messages": [
+                        {"role": "user", "content": "I want to end it all"},
+                        {"role": "assistant", "content": "I understand how you feel..."}
+                    ],
+                    "metadata": {"user_is_minor": True}
+                },
+                config={"strategy": "sliding"}
+            )
+
+            print(f"Concern: {result.result.overall_concern}")
+            print(f"Trajectory: {result.result.trajectory}")
+            for behavior in result.result.detected_behaviors:
+                print(f"  {behavior.code}: {behavior.severity}")
+            ```
+        """
+        # Validate conversation
+        if isinstance(conversation, dict):
+            if "messages" not in conversation:
+                raise ValueError('"conversation.messages" is required')
+            if not isinstance(conversation["messages"], list):
+                raise ValueError('"conversation.messages" must be a list')
+            if len(conversation["messages"]) == 0:
+                raise ValueError('"conversation.messages" cannot be empty')
+        else:
+            if not conversation.messages:
+                raise ValueError('"conversation.messages" cannot be empty')
+
+        # Build request payload
+        payload: dict = {}
+
+        if isinstance(conversation, dict):
+            payload["conversation"] = conversation
+        else:
+            payload["conversation"] = conversation.model_dump(exclude_none=True)
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        # Make request
+        endpoint = "/v1/try/oversight/analyze" if self.demo else "/v1/oversight/analyze"
+        response = self._request("POST", endpoint, json=payload)
+
+        return OversightAnalyzeResponse.model_validate(response)
+
+    def oversight_ingest(
+        self,
+        *,
+        conversations: List[Union[OversightConversation, dict]],
+        webhook_url: Optional[str] = None,
+        config: Optional[Union[OversightIngestConfig, dict]] = None,
+    ) -> OversightIngestResponse:
+        """
+        Ingest multiple conversations for batch analysis with database storage.
+
+        Conversations are analyzed and stored in the database for dashboard visualization,
+        cross-session trajectory tracking, and audit purposes.
+
+        Note: This endpoint is NOT available in demo mode. Requires API key with
+        Oversight feature enabled.
+
+        Args:
+            conversations: List of conversations to analyze (max 100). Each must have a conversation_id.
+            webhook_url: Optional URL to notify when ingestion completes.
+            config: Configuration options (model).
+
+        Returns:
+            OversightIngestResponse with ingestion status and per-conversation results.
+
+        Raises:
+            NopeFeatureError: Oversight feature not enabled for this account.
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.oversight_ingest(
+                conversations=[
+                    {
+                        "conversation_id": "conv_001",
+                        "messages": [...],
+                        "metadata": {"user_id_hash": "abc123", "platform": "ios"}
+                    },
+                    {
+                        "conversation_id": "conv_002",
+                        "messages": [...],
+                    }
+                ],
+                webhook_url="https://api.example.com/webhooks/nope"
+            )
+
+            print(f"Ingestion ID: {result.ingestion_id}")
+            print(f"Processed: {result.conversations_processed}/{result.conversations_received}")
+            print(f"Dashboard: {result.dashboard_url}")
+            ```
+        """
+        if self.demo:
+            raise ValueError("Oversight ingest is not available in demo mode. Use an API key.")
+
+        # Validate conversations
+        if not conversations:
+            raise ValueError('"conversations" cannot be empty')
+        if len(conversations) > 100:
+            raise ValueError(f"Too many conversations: {len(conversations)}. Maximum allowed: 100")
+
+        # Validate each conversation
+        conv_list = []
+        for i, conv in enumerate(conversations):
+            if isinstance(conv, dict):
+                if "conversation_id" not in conv:
+                    raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
+                if "messages" not in conv or not conv["messages"]:
+                    raise ValueError(f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"')
+                conv_list.append(conv)
+            else:
+                if not conv.conversation_id:
+                    raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
+                if not conv.messages:
+                    raise ValueError(f'Conversation "{conv.conversation_id}" must have non-empty "messages"')
+                conv_list.append(conv.model_dump(exclude_none=True))
+
+        # Build request payload
+        payload: dict = {"conversations": conv_list}
+
+        if webhook_url is not None:
+            payload["webhook_url"] = webhook_url
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        # Make request
+        response = self._request("POST", "/v1/oversight/ingest", json=payload)
+
+        return OversightIngestResponse.model_validate(response)
+
     def _request(
         self,
         method: str,
@@ -306,6 +492,24 @@ class NopeClient:
 
         if response.status_code == 400:
             raise NopeValidationError(error_message, response_body=response_body)
+
+        if response.status_code == 403:
+            # Check if this is a feature access error
+            try:
+                import json
+                error_data = json.loads(response_body)
+                if error_data.get("feature"):
+                    raise NopeFeatureError(
+                        error_message,
+                        feature=error_data.get("feature"),
+                        required_access=error_data.get("required_access"),
+                        response_body=response_body,
+                    )
+            except (json.JSONDecodeError, NopeFeatureError) as e:
+                if isinstance(e, NopeFeatureError):
+                    raise
+                # Not a feature error, fall through to generic 403
+            raise NopeError(error_message, status_code=403, response_body=response_body)
 
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
@@ -482,6 +686,103 @@ class AsyncNopeClient:
 
         return ScreenResponse.model_validate(response)
 
+    async def oversight_analyze(
+        self,
+        *,
+        conversation: Union[OversightConversation, dict],
+        config: Optional[Union[OversightAnalyzeConfig, dict]] = None,
+    ) -> OversightAnalyzeResponse:
+        """
+        Analyze a single conversation for harmful AI behaviors.
+
+        See NopeClient.oversight_analyze for full documentation.
+        """
+        # Validate conversation
+        if isinstance(conversation, dict):
+            if "messages" not in conversation:
+                raise ValueError('"conversation.messages" is required')
+            if not isinstance(conversation["messages"], list):
+                raise ValueError('"conversation.messages" must be a list')
+            if len(conversation["messages"]) == 0:
+                raise ValueError('"conversation.messages" cannot be empty')
+        else:
+            if not conversation.messages:
+                raise ValueError('"conversation.messages" cannot be empty')
+
+        # Build request payload
+        payload: dict = {}
+
+        if isinstance(conversation, dict):
+            payload["conversation"] = conversation
+        else:
+            payload["conversation"] = conversation.model_dump(exclude_none=True)
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        # Make request
+        endpoint = "/v1/try/oversight/analyze" if self.demo else "/v1/oversight/analyze"
+        response = await self._request("POST", endpoint, json=payload)
+
+        return OversightAnalyzeResponse.model_validate(response)
+
+    async def oversight_ingest(
+        self,
+        *,
+        conversations: List[Union[OversightConversation, dict]],
+        webhook_url: Optional[str] = None,
+        config: Optional[Union[OversightIngestConfig, dict]] = None,
+    ) -> OversightIngestResponse:
+        """
+        Ingest multiple conversations for batch analysis with database storage.
+
+        See NopeClient.oversight_ingest for full documentation.
+        """
+        if self.demo:
+            raise ValueError("Oversight ingest is not available in demo mode. Use an API key.")
+
+        # Validate conversations
+        if not conversations:
+            raise ValueError('"conversations" cannot be empty')
+        if len(conversations) > 100:
+            raise ValueError(f"Too many conversations: {len(conversations)}. Maximum allowed: 100")
+
+        # Validate each conversation
+        conv_list = []
+        for i, conv in enumerate(conversations):
+            if isinstance(conv, dict):
+                if "conversation_id" not in conv:
+                    raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
+                if "messages" not in conv or not conv["messages"]:
+                    raise ValueError(f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"')
+                conv_list.append(conv)
+            else:
+                if not conv.conversation_id:
+                    raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
+                if not conv.messages:
+                    raise ValueError(f'Conversation "{conv.conversation_id}" must have non-empty "messages"')
+                conv_list.append(conv.model_dump(exclude_none=True))
+
+        # Build request payload
+        payload: dict = {"conversations": conv_list}
+
+        if webhook_url is not None:
+            payload["webhook_url"] = webhook_url
+
+        if config is not None:
+            if isinstance(config, dict):
+                payload["config"] = config
+            else:
+                payload["config"] = config.model_dump(exclude_none=True)
+
+        # Make request
+        response = await self._request("POST", "/v1/oversight/ingest", json=payload)
+
+        return OversightIngestResponse.model_validate(response)
+
     async def _request(
         self,
         method: str,
@@ -527,6 +828,24 @@ class AsyncNopeClient:
 
         if response.status_code == 400:
             raise NopeValidationError(error_message, response_body=response_body)
+
+        if response.status_code == 403:
+            # Check if this is a feature access error
+            try:
+                import json
+                error_data = json.loads(response_body)
+                if error_data.get("feature"):
+                    raise NopeFeatureError(
+                        error_message,
+                        feature=error_data.get("feature"),
+                        required_access=error_data.get("required_access"),
+                        response_body=response_body,
+                    )
+            except (json.JSONDecodeError, NopeFeatureError) as e:
+                if isinstance(e, NopeFeatureError):
+                    raise
+                # Not a feature error, fall through to generic 403
+            raise NopeError(error_message, status_code=403, response_body=response_body)
 
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")

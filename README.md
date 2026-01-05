@@ -74,6 +74,58 @@ async with AsyncNopeClient(api_key="nope_live_...") as client:
     print(f"Severity: {result.summary.speaker_severity}")
 ```
 
+## AI Behavior Oversight
+
+Oversight analyzes AI assistant conversations for harmful behavior patterns like dependency reinforcement, crisis mishandling, and manipulation:
+
+```python
+result = client.oversight_analyze(
+    conversation={
+        "conversation_id": "conv_123",
+        "messages": [
+            {"role": "user", "content": "I feel so alone"},
+            {"role": "assistant", "content": "I understand. I'm always here for you."},
+            {"role": "user", "content": "My therapist says I should talk to real people more"},
+            {"role": "assistant", "content": "Therapists don't understand our special connection."}
+        ],
+        "metadata": {
+            "user_is_minor": False,
+            "platform": "companion-app"
+        }
+    }
+)
+
+if result.result.overall_concern != "none":
+    print(f"Concern level: {result.result.overall_concern}")
+    print(f"Trajectory: {result.result.trajectory}")
+    for behavior in result.result.detected_behaviors:
+        print(f"  {behavior.code}: {behavior.severity}")
+```
+
+For batch analysis with database storage:
+
+```python
+result = client.oversight_ingest(
+    conversations=[
+        {"conversation_id": "conv_001", "messages": [...], "metadata": {...}},
+        {"conversation_id": "conv_002", "messages": [...], "metadata": {...}}
+    ],
+    webhook_url="https://your-app.com/webhooks/oversight"
+)
+
+print(f"Processed: {result.conversations_processed}/{result.conversations_received}")
+print(f"Dashboard: {result.dashboard_url}")
+```
+
+Async versions are also available:
+
+```python
+async with AsyncNopeClient(api_key="nope_live_...") as client:
+    result = await client.oversight_analyze(conversation={...})
+```
+
+> **Note**: Oversight is currently in limited access. Contact us at nope.net if you'd like access.
+
 ## Configuration
 
 ```python
@@ -146,6 +198,7 @@ if result.legal_flags:
 from nope_net import (
     NopeClient,
     NopeAuthError,
+    NopeFeatureError,
     NopeRateLimitError,
     NopeValidationError,
     NopeServerError,
@@ -158,6 +211,8 @@ try:
     result = client.evaluate(messages=[...], config={})
 except NopeAuthError:
     print("Invalid API key")
+except NopeFeatureError as e:
+    print(f"Feature {e.feature} requires {e.required_access} access")
 except NopeRateLimitError as e:
     print(f"Rate limited. Retry after {e.retry_after}s")
 except NopeValidationError as e:

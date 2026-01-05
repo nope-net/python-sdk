@@ -110,3 +110,29 @@ class NopeConnectionError(NopeError):
     ):
         super().__init__(message)
         self.original_error = original_error
+
+
+class NopeFeatureError(NopeError):
+    """
+    Feature access denied (HTTP 403).
+
+    Raised when the account doesn't have access to a feature (e.g., Oversight).
+    Contact NOPE to request access to the feature.
+    """
+
+    def __init__(
+        self,
+        message: str = "Feature not enabled for this account",
+        feature: Optional[str] = None,
+        required_access: Optional[str] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(message, status_code=403, response_body=response_body)
+        self.feature = feature
+        self.required_access = required_access
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.feature:
+            return f"{base} (feature: {self.feature})"
+        return base
