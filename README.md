@@ -57,9 +57,17 @@ if result.show_resources:
     print(f"Rationale: {result.rationale}")
     if result.resources:
         print(f"Call {result.resources.primary.phone}")
+
+# Access detailed risks array (all 9 risk types)
+for risk in result.risks:
+    print(f"{risk.type}: {risk.severity} (subject: {risk.subject})")
 ```
 
-The `/v1/screen` endpoint is ~20x cheaper than `/v1/evaluate` and returns independent detection flags (`suicidal_ideation`, `self_harm`), pre-formatted crisis resources, and audit trail fields (`request_id`, `timestamp`).
+The `/v1/screen` endpoint is ~50x cheaper than `/v1/evaluate` and returns:
+- Boolean flags (`suicidal_ideation`, `self_harm`, `show_resources`)
+- Detailed `risks` array covering all 9 risk types with severity and imminence
+- Pre-formatted crisis resources
+- Audit trail fields (`request_id`, `timestamp`)
 
 ## Async Usage
 
@@ -126,6 +134,37 @@ async with AsyncNopeClient(api_key="nope_live_...") as client:
 
 > **Note**: Oversight is currently in limited access. Contact us at nope.net if you'd like access.
 
+## Crisis Resources API
+
+Look up crisis helplines by country, with optional AI-powered ranking:
+
+```python
+# Get resources by country
+resources = client.resources(
+    country="US",
+    config={"scopes": ["suicide", "crisis"], "urgent": True}
+)
+for resource in resources.resources:
+    print(f"{resource.name}: {resource.phone}")
+
+# AI-ranked resources based on context
+ranked = client.resources_smart(
+    country="US",
+    query="teen struggling with eating disorder"
+)
+for item in ranked.ranked:
+    print(f"{item.rank}. {item.resource.name}")
+    print(f"   Why: {item.why}")
+
+# List supported countries
+countries = client.resources_countries()
+print(f"Supported: {', '.join(countries.countries)}")
+
+# Detect user's country from request
+detected = client.detect_country()
+print(f"Country: {detected.country_code}")
+```
+
 ## Configuration
 
 ```python
@@ -134,6 +173,9 @@ client = NopeClient(
     base_url="https://api.nope.net", # Optional, for self-hosted
     timeout=30.0,                    # Request timeout in seconds
 )
+
+# Demo mode - no API key required, uses /v1/try/* endpoints
+demo_client = NopeClient(demo=True)
 ```
 
 ### Evaluate Options
