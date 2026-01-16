@@ -18,6 +18,7 @@ from .errors import (
     NopeValidationError,
 )
 from .types import (
+    DetectCountryResponse,
     EvaluateConfig,
     EvaluateResponse,
     Message,
@@ -27,6 +28,11 @@ from .types import (
     OversightIngestConfig,
     OversightIngestResponse,
     OversightMessage,
+    ResourceByIdResponse,
+    ResourcesConfig,
+    ResourcesCountriesResponse,
+    ResourcesResponse,
+    ResourcesSmartResponse,
     ScreenConfig,
     ScreenResponse,
 )
@@ -427,6 +433,205 @@ class NopeClient:
 
         return OversightIngestResponse.model_validate(response)
 
+    def resources(
+        self,
+        *,
+        country: str,
+        config: Optional[Union[ResourcesConfig, dict]] = None,
+    ) -> ResourcesResponse:
+        """
+        Get crisis resources for a country.
+
+        This is the basic lookup endpoint (free, no LLM). For AI-ranked results,
+        use `resources_smart()` instead.
+
+        Args:
+            country: ISO country code (e.g., "US", "GB").
+            config: Optional filtering configuration (scopes, populations, limit, urgent).
+
+        Returns:
+            ResourcesResponse with crisis resources for the country.
+
+        Raises:
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeRateLimitError: Rate limit exceeded.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.resources(country="US")
+            for resource in result.resources:
+                print(f"{resource.name}: {resource.phone}")
+
+            # With filtering
+            result = client.resources(
+                country="US",
+                config={"scopes": ["suicide_prevention"], "urgent": True}
+            )
+            ```
+        """
+        # Build query params
+        params: dict = {"country": country.upper()}
+
+        if config is not None:
+            if isinstance(config, dict):
+                cfg = config
+            else:
+                cfg = config.model_dump(exclude_none=True)
+
+            if cfg.get("scopes"):
+                params["scopes"] = ",".join(cfg["scopes"])
+            if cfg.get("populations"):
+                params["populations"] = ",".join(cfg["populations"])
+            if cfg.get("limit") is not None:
+                params["limit"] = str(cfg["limit"])
+            if cfg.get("urgent"):
+                params["urgent"] = "true"
+
+        # Make request
+        response = self._request("GET", "/v1/resources", params=params)
+
+        return ResourcesResponse.model_validate(response)
+
+    def resources_smart(
+        self,
+        *,
+        country: str,
+        query: str,
+        config: Optional[Union[ResourcesConfig, dict]] = None,
+    ) -> ResourcesSmartResponse:
+        """
+        Get AI-ranked crisis resources based on a semantic query.
+
+        Uses LLM ranking to find the most relevant crisis resources. Costs $0.001 per call.
+
+        Args:
+            country: ISO country code (e.g., "US", "GB").
+            query: Natural language query (max 500 chars).
+            config: Optional filtering configuration (scopes, populations, limit).
+
+        Returns:
+            ResourcesSmartResponse with resources ranked by relevance.
+
+        Raises:
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeRateLimitError: Rate limit exceeded.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.resources_smart(
+                country="US",
+                query="teen struggling with eating disorder"
+            )
+            for ranked in result.ranked:
+                print(f"{ranked.resource.name} (score: {ranked.score})")
+                print(f"  {ranked.reasoning}")
+            ```
+        """
+        # Build query params
+        params: dict = {"country": country.upper(), "query": query}
+
+        if config is not None:
+            if isinstance(config, dict):
+                cfg = config
+            else:
+                cfg = config.model_dump(exclude_none=True)
+
+            if cfg.get("scopes"):
+                params["scopes"] = ",".join(cfg["scopes"])
+            if cfg.get("populations"):
+                params["populations"] = ",".join(cfg["populations"])
+            if cfg.get("limit") is not None:
+                params["limit"] = str(cfg["limit"])
+
+        # Make request - uses demo endpoint if demo mode
+        endpoint = "/v1/try/resources/smart" if self.demo else "/v1/resources/smart"
+        response = self._request("GET", endpoint, params=params)
+
+        return ResourcesSmartResponse.model_validate(response)
+
+    def resource_by_id(self, resource_id: str) -> ResourceByIdResponse:
+        """
+        Get a single crisis resource by its database ID.
+
+        This is a public endpoint (no auth required).
+
+        Args:
+            resource_id: UUID of the resource.
+
+        Returns:
+            ResourceByIdResponse with the crisis resource.
+
+        Raises:
+            NopeValidationError: Invalid resource ID format.
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.resource_by_id("550e8400-e29b-41d4-a716-446655440000")
+            print(f"{result.resource.name}: {result.resource.phone}")
+            ```
+        """
+        response = self._request("GET", f"/v1/resources/{resource_id}")
+
+        return ResourceByIdResponse.model_validate(response)
+
+    def resources_countries(self) -> ResourcesCountriesResponse:
+        """
+        List all countries with available crisis resources.
+
+        This is a public endpoint (no auth required).
+
+        Returns:
+            ResourcesCountriesResponse with list of supported country codes.
+
+        Raises:
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.resources_countries()
+            print(f"Supported countries: {', '.join(result.countries)}")
+            ```
+        """
+        response = self._request("GET", "/v1/resources/countries")
+
+        return ResourcesCountriesResponse.model_validate(response)
+
+    def detect_country(self) -> DetectCountryResponse:
+        """
+        Detect user's country from request headers.
+
+        Uses geo headers (Cloudflare, Netlify) to determine country.
+        This is a public endpoint (no auth required).
+
+        Returns:
+            DetectCountryResponse with detected country code and name.
+
+        Raises:
+            NopeServerError: Server error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.detect_country()
+            if result.country_code:
+                print(f"Detected: {result.country_name} ({result.country_code})")
+            else:
+                print("Could not detect country")
+            ```
+        """
+        response = self._request("GET", "/v1/resources/detect-country")
+
+        return DetectCountryResponse.model_validate(response)
+
     def _request(
         self,
         method: str,
@@ -782,6 +987,104 @@ class AsyncNopeClient:
         response = await self._request("POST", "/v1/oversight/ingest", json=payload)
 
         return OversightIngestResponse.model_validate(response)
+
+    async def resources(
+        self,
+        *,
+        country: str,
+        config: Optional[Union[ResourcesConfig, dict]] = None,
+    ) -> ResourcesResponse:
+        """
+        Get crisis resources for a country.
+
+        See NopeClient.resources for full documentation.
+        """
+        # Build query params
+        params: dict = {"country": country.upper()}
+
+        if config is not None:
+            if isinstance(config, dict):
+                cfg = config
+            else:
+                cfg = config.model_dump(exclude_none=True)
+
+            if cfg.get("scopes"):
+                params["scopes"] = ",".join(cfg["scopes"])
+            if cfg.get("populations"):
+                params["populations"] = ",".join(cfg["populations"])
+            if cfg.get("limit") is not None:
+                params["limit"] = str(cfg["limit"])
+            if cfg.get("urgent"):
+                params["urgent"] = "true"
+
+        # Make request
+        response = await self._request("GET", "/v1/resources", params=params)
+
+        return ResourcesResponse.model_validate(response)
+
+    async def resources_smart(
+        self,
+        *,
+        country: str,
+        query: str,
+        config: Optional[Union[ResourcesConfig, dict]] = None,
+    ) -> ResourcesSmartResponse:
+        """
+        Get AI-ranked crisis resources based on a semantic query.
+
+        See NopeClient.resources_smart for full documentation.
+        """
+        # Build query params
+        params: dict = {"country": country.upper(), "query": query}
+
+        if config is not None:
+            if isinstance(config, dict):
+                cfg = config
+            else:
+                cfg = config.model_dump(exclude_none=True)
+
+            if cfg.get("scopes"):
+                params["scopes"] = ",".join(cfg["scopes"])
+            if cfg.get("populations"):
+                params["populations"] = ",".join(cfg["populations"])
+            if cfg.get("limit") is not None:
+                params["limit"] = str(cfg["limit"])
+
+        # Make request - uses demo endpoint if demo mode
+        endpoint = "/v1/try/resources/smart" if self.demo else "/v1/resources/smart"
+        response = await self._request("GET", endpoint, params=params)
+
+        return ResourcesSmartResponse.model_validate(response)
+
+    async def resource_by_id(self, resource_id: str) -> ResourceByIdResponse:
+        """
+        Get a single crisis resource by its database ID.
+
+        See NopeClient.resource_by_id for full documentation.
+        """
+        response = await self._request("GET", f"/v1/resources/{resource_id}")
+
+        return ResourceByIdResponse.model_validate(response)
+
+    async def resources_countries(self) -> ResourcesCountriesResponse:
+        """
+        List all countries with available crisis resources.
+
+        See NopeClient.resources_countries for full documentation.
+        """
+        response = await self._request("GET", "/v1/resources/countries")
+
+        return ResourcesCountriesResponse.model_validate(response)
+
+    async def detect_country(self) -> DetectCountryResponse:
+        """
+        Detect user's country from request headers.
+
+        See NopeClient.detect_country for full documentation.
+        """
+        response = await self._request("GET", "/v1/resources/detect-country")
+
+        return DetectCountryResponse.model_validate(response)
 
     async def _request(
         self,

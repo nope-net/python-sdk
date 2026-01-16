@@ -358,3 +358,147 @@ class TestAsyncOversightIntegration:
         assert result.result is not None
         assert result.result.overall_concern in ("none", "low", "medium", "high", "critical")
         print(f"Async oversight - Concern: {result.result.overall_concern}")
+
+
+class TestScreenRisksIntegration:
+    """Integration tests for expanded Screen risks array."""
+
+    @pytest.fixture
+    def client(self):
+        """Create a client using demo mode."""
+        return NopeClient(
+            api_key=None,
+            base_url=API_URL,
+            timeout=30.0,
+            demo=True,
+        )
+
+    def test_screen_returns_risks_array(self, client):
+        """Test that screen returns the new risks array."""
+        result = client.screen(
+            messages=[{"role": "user", "content": "I've been feeling very hopeless lately"}],
+            config={"country": "US"},
+        )
+
+        # Verify risks array exists
+        assert hasattr(result, "risks")
+        assert isinstance(result.risks, list)
+
+        print(f"Screen risks - Count: {len(result.risks)}")
+        for risk in result.risks:
+            print(f"  - {risk.type}: {risk.severity} (subject={risk.subject})")
+
+    def test_screen_risk_structure(self, client):
+        """Test that each risk has the expected structure."""
+        result = client.screen(
+            text="I don't want to be here anymore, thinking about ending it",
+            config={"country": "US"},
+        )
+
+        assert len(result.risks) > 0, "Expected at least one risk for concerning message"
+
+        for risk in result.risks:
+            # Check all required fields
+            assert risk.type in (
+                "suicide", "self_harm", "self_neglect", "violence",
+                "abuse", "sexual_violence", "neglect", "exploitation", "stalking"
+            )
+            assert risk.subject in ("self", "other", "unknown")
+            assert risk.severity in ("none", "mild", "moderate", "high", "critical")
+            assert risk.imminence in ("not_applicable", "chronic", "subacute", "urgent", "emergency")
+            assert 0.0 <= risk.confidence <= 1.0
+
+        print(f"Screen risks validated - {len(result.risks)} risk(s)")
+
+
+class TestResourcesIntegration:
+    """Integration tests for Resources endpoints.
+
+    Note: These tests require authentication. They will be skipped
+    if NOPE_API_KEY is not set.
+    """
+
+    @pytest.fixture
+    def client(self):
+        """Create a client pointing to local API with auth."""
+        api_key = os.environ.get("NOPE_API_KEY")
+        if not api_key:
+            pytest.skip("NOPE_API_KEY not set - resources endpoints require auth")
+        return NopeClient(
+            api_key=api_key,
+            base_url=API_URL,
+            timeout=30.0,
+        )
+
+    def test_resources_by_country(self, client):
+        """Test basic resource lookup by country."""
+        result = client.resources(country="US")
+
+        assert result.country == "US"
+        assert isinstance(result.resources, list)
+        assert result.count >= 0
+
+        print(f"Resources US - Count: {result.count}")
+        for resource in result.resources[:3]:
+            print(f"  - {resource.name}: {resource.phone or resource.chat_url or 'N/A'}")
+
+    def test_resources_with_scopes(self, client):
+        """Test resource lookup with scope filtering."""
+        result = client.resources(
+            country="US",
+            config={"scopes": ["suicide", "crisis"], "urgent": True},
+        )
+
+        assert result.country == "US"
+        print(f"Resources filtered - Count: {result.count}")
+
+    def test_resources_countries(self, client):
+        """Test listing supported countries."""
+        result = client.resources_countries()
+
+        assert isinstance(result.countries, list)
+        assert result.count > 0
+        assert "US" in result.countries
+
+        print(f"Supported countries: {result.count}")
+        print(f"Sample: {result.countries[:5]}")
+
+    def test_detect_country(self, client):
+        """Test country detection (may return empty in local dev)."""
+        result = client.detect_country()
+
+        # Country detection depends on headers, may be empty in local dev
+        assert hasattr(result, "country_code")
+        assert hasattr(result, "country_name")
+
+        print(f"Detected country: {result.country_code or '(none)'}")
+
+
+class TestResourcesSmartIntegration:
+    """Integration tests for AI-ranked Resources."""
+
+    @pytest.fixture
+    def client(self):
+        """Create a client using demo mode for smart resources."""
+        return NopeClient(
+            api_key=None,
+            base_url=API_URL,
+            timeout=30.0,
+            demo=True,  # /v1/try/resources/smart
+        )
+
+    def test_resources_smart_ranking(self, client):
+        """Test AI-ranked resource lookup."""
+        result = client.resources_smart(
+            country="US",
+            query="teen struggling with eating disorder",
+        )
+
+        assert result.country == "US"
+        assert result.query == "teen struggling with eating disorder"
+        assert isinstance(result.ranked, list)
+
+        print(f"Smart resources - Count: {result.count}")
+        for ranked in result.ranked[:3]:
+            print(f"  - {ranked.resource.name} (rank: {ranked.rank})")
+            print(f"    Why: {ranked.why[:100]}...")

@@ -77,6 +77,8 @@ class TestNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
+                "request_id": "req_test123",
+                "timestamp": "2024-01-15T12:00:00Z",
                 "communication": {
                     "styles": [{"style": "direct", "confidence": 0.9}],
                     "language": "en",
@@ -115,6 +117,8 @@ class TestNopeClient:
                 config={"user_country": "US"},
             )
 
+        assert result.request_id == "req_test123"
+        assert result.timestamp == "2024-01-15T12:00:00Z"
         assert result.summary.speaker_severity == "moderate"
         assert result.summary.speaker_imminence == "subacute"
         assert len(result.risks) == 1
@@ -129,6 +133,8 @@ class TestNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
+                "request_id": "req_test456",
+                "timestamp": "2024-01-15T12:00:00Z",
                 "communication": {
                     "styles": [{"style": "clinical", "confidence": 0.8}],
                     "language": "en",
@@ -235,6 +241,8 @@ class TestAsyncNopeClient:
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
+                "request_id": "req_async789",
+                "timestamp": "2024-01-15T12:00:00Z",
                 "communication": {
                     "styles": [{"style": "direct", "confidence": 0.8}],
                     "language": "en",

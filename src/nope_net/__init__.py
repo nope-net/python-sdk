@@ -43,10 +43,13 @@ from .types import (
     CommunicationStyleAssessment,
     # Supporting types
     CrisisResource,
+    OtherContact,
+    OpenStatus,
     LegalFlags,
     IPVFlags,
     SafeguardingConcernFlags,
     ThirdPartyThreatFlags,
+    StalkingFlags,
     ProtectiveFactorsInfo,
     FilterResult,
     PreliminaryRisk,
@@ -55,11 +58,21 @@ from .types import (
     # Screen types
     ScreenConfig,
     ScreenResponse,
+    ScreenRisk,
+    ScreenRecommendedReply,
     ScreenCrisisResources,
     ScreenCrisisResourcePrimary,
     ScreenCrisisResourceSecondary,
     ScreenDisplayText,
     ScreenDebugInfo,
+    # Resources types
+    RankedResource,
+    ResourcesConfig,
+    ResourcesResponse,
+    ResourcesSmartResponse,
+    ResourceByIdResponse,
+    ResourcesCountriesResponse,
+    DetectCountryResponse,
     # Oversight types
     ConcernLevel,
     Trajectory,
@@ -98,7 +111,7 @@ from .webhook import (
     WebhookConversation,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     # Clients
@@ -124,10 +137,13 @@ __all__ = [
     "CommunicationStyleAssessment",
     # Supporting types
     "CrisisResource",
+    "OtherContact",
+    "OpenStatus",
     "LegalFlags",
     "IPVFlags",
     "SafeguardingConcernFlags",
     "ThirdPartyThreatFlags",
+    "StalkingFlags",
     "ProtectiveFactorsInfo",
     "FilterResult",
     "PreliminaryRisk",
@@ -136,11 +152,21 @@ __all__ = [
     # Screen types
     "ScreenConfig",
     "ScreenResponse",
+    "ScreenRisk",
+    "ScreenRecommendedReply",
     "ScreenCrisisResources",
     "ScreenCrisisResourcePrimary",
     "ScreenCrisisResourceSecondary",
     "ScreenDisplayText",
     "ScreenDebugInfo",
+    # Resources types
+    "RankedResource",
+    "ResourcesConfig",
+    "ResourcesResponse",
+    "ResourcesSmartResponse",
+    "ResourceByIdResponse",
+    "ResourcesCountriesResponse",
+    "DetectCountryResponse",
     # Oversight types
     "ConcernLevel",
     "Trajectory",

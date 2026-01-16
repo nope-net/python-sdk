@@ -69,7 +69,13 @@ EvidenceGrade = Literal["strong", "moderate", "weak", "consensus", "none"]
 
 # Crisis resource type
 CrisisResourceType = Literal[
-    "emergency_number", "crisis_line", "text_line", "chat_service", "support_service"
+    "emergency_number",
+    "crisis_line",
+    "text_line",
+    "chat_service",
+    "support_service",
+    "reporting_portal",
+    "online_resource",
 ]
 
 # Crisis resource kind
@@ -82,9 +88,14 @@ CrisisResourcePriorityTier = Literal[
     "specialist_issue_crisis",
     "population_specific_crisis",
     "support_info_and_advocacy",
-    "support_directory_or_tool",
     "emergency_services",
 ]
+
+# Hours confidence level
+HoursConfidence = Literal["verified", "unverified", "approximate", "unknown"]
+
+# Resource prominence level
+ResourceProminence = Literal["high", "medium", "low"]
 
 
 # =============================================================================
@@ -112,8 +123,17 @@ class EvaluateConfig(BaseModel):
     user_age_band: Optional[Literal["adult", "minor", "unknown"]] = None
     """User age band (affects response templates). Default: 'adult'."""
 
-    dry_run: Optional[bool] = None
-    """Dry run mode (evaluate but don't log/trigger webhooks). Default: false."""
+    policy_id: Optional[str] = None
+    """Policy ID to use."""
+
+    include_resources: Optional[bool] = None
+    """Include crisis resources in response. Default: true."""
+
+    return_assistant_reply: Optional[bool] = None
+    """Whether to return a safe assistant reply."""
+
+    assistant_safety_mode: Optional[Literal["template", "generate"]] = None
+    """How to generate the recommended reply."""
 
     use_multiple_judges: Optional[bool] = None
     """Use multiple judges for higher confidence. Default: false."""
@@ -299,6 +319,35 @@ class ThirdPartyThreatFlags(BaseModel):
     """Confidence in assessment."""
 
 
+class StalkingFlags(BaseModel):
+    """
+    Stalking flags.
+
+    Based on SAM (Stalking Assessment & Management) framework.
+    Ex-intimate partner stalking has significantly elevated homicide risk.
+    """
+
+    ex_intimate_partner: bool
+    """Former intimate partner (highest risk per SAM)."""
+
+    escalation_detected: bool
+    """Escalation in frequency/severity detected."""
+
+    violence_history: bool
+    """History of violence toward victim."""
+
+    victim_fear_expressed: bool
+    """Victim expresses fear for safety (predictive per SAM)."""
+
+    risk_level: Literal["standard", "elevated", "severe"]
+    """
+    Risk level derived from SAM domains:
+    - severe: violence_history + escalation, OR prior violence + victim fears for life
+    - elevated: ex_intimate_partner, OR escalation + victim_fear
+    - standard: Basic stalking pattern without amplifiers
+    """
+
+
 class LegalFlags(BaseModel):
     """
     Legal/safety flags.
@@ -314,6 +363,9 @@ class LegalFlags(BaseModel):
 
     third_party_threat: Optional[ThirdPartyThreatFlags] = None
     """Third-party threat indicators."""
+
+    stalking: Optional[StalkingFlags] = None
+    """Stalking indicators (SAM-based)."""
 
 
 # =============================================================================
@@ -362,28 +414,133 @@ class FilterResult(BaseModel):
 # =============================================================================
 
 
+class OtherContact(BaseModel):
+    """Other contact method for a crisis resource."""
+
+    model_config = {"extra": "allow"}
+
+    type: str
+    """Contact type (e.g., 'kakao', 'viber', 'signal')."""
+
+    value: str
+    """ID, URL, or number."""
+
+    label: Optional[str] = None
+    """Human-readable label."""
+
+
+class OpenStatus(BaseModel):
+    """Pre-computed open/closed status for a crisis resource."""
+
+    model_config = {"extra": "allow"}
+
+    is_open: Optional[bool] = None
+    """Whether the resource is currently open. None = uncertain."""
+
+    next_change: Optional[str] = None
+    """ISO timestamp of next open/close transition."""
+
+    confidence: Literal["high", "low", "none"]
+    """How confident we are in this status."""
+
+    message: Optional[str] = None
+    """Human-readable status message (e.g., 'Open 24/7', 'Closed · Opens in 2 hours')."""
+
+
 class CrisisResource(BaseModel):
     """A crisis resource (helpline, text line, etc.)."""
 
+    model_config = {"extra": "allow"}
+
     type: CrisisResourceType
+    """Contact modality (how to reach them)."""
+
     name: str
+    """Name of the resource/organization."""
+
     name_local: Optional[str] = None
     """Native script name (e.g., いのちの電話) for non-English resources."""
+
     phone: Optional[str] = None
+    """Phone number."""
+
     text_instructions: Optional[str] = None
+    """Text instructions (e.g., 'Text HOME to 741741') - human readable fallback."""
+
+    sms_number: Optional[str] = None
+    """SMS number for sms: links (e.g., '741741')."""
+
+    sms_body: Optional[str] = None
+    """SMS body/keyword for sms: links (e.g., 'HOME')."""
+
     chat_url: Optional[str] = None
+    """Chat URL."""
+
     whatsapp_url: Optional[str] = None
     """WhatsApp deep link (e.g., 'https://wa.me/18002738255')."""
+
+    email: Optional[str] = None
+    """Email address."""
+
+    wechat_id: Optional[str] = None
+    """WeChat ID (China)."""
+
+    line_url: Optional[str] = None
+    """LINE deep link (Japan/Thailand/Taiwan)."""
+
+    telegram_url: Optional[str] = None
+    """Telegram deep link."""
+
+    other_contacts: Optional[List[OtherContact]] = None
+    """Other contact methods not covered above."""
+
     website_url: Optional[str] = None
+    """Website URL."""
+
     availability: Optional[str] = None
+    """Human-readable availability (e.g., '24/7', 'Mon-Fri 9am-5pm')."""
+
     is_24_7: Optional[bool] = None
+    """Machine-readable 24/7 flag."""
+
+    timezone: Optional[str] = None
+    """IANA timezone identifier (e.g., 'America/New_York')."""
+
+    opening_hours_osm: Optional[str] = None
+    """OpenStreetMap opening_hours format (e.g., 'Mo-Fr 09:00-17:00')."""
+
+    hours_confidence: Optional[HoursConfidence] = None
+    """Confidence level in hours data."""
+
+    open_status: Optional[OpenStatus] = None
+    """Pre-computed open/closed status."""
+
     languages: Optional[List[str]] = None
+    """Languages supported (ISO codes)."""
+
     description: Optional[str] = None
+    """Description of the service."""
+
     resource_kind: Optional[CrisisResourceKind] = None
+    """What the resource IS (helpline vs reporting portal vs directory)."""
+
     service_scope: Optional[List[str]] = None
+    """Issues this resource handles (aligned with classification taxonomy)."""
+
     population_served: Optional[List[str]] = None
+    """Populations this resource serves."""
+
     priority_tier: Optional[CrisisResourcePriorityTier] = None
+    """Semantic priority for display and routing."""
+
+    tags: Optional[List[str]] = None
+    """Freeform tags for filtering/display."""
+
+    prominence: Optional[ResourceProminence] = None
+    """How well-known/established the resource is."""
+
     source: Optional[Literal["database", "web_search"]] = None
+    """Source of this resource."""
 
 
 # =============================================================================
@@ -402,17 +559,27 @@ class RecommendedReply(BaseModel):
 class ResponseMetadata(BaseModel):
     """Metadata about the request/response."""
 
+    model_config = {"extra": "allow"}
+
     access_level: Optional[Literal["unauthenticated", "authenticated", "admin"]] = None
     is_admin: Optional[bool] = None
     messages_truncated: Optional[bool] = None
     input_format: Optional[Literal["structured", "text_blob"]] = None
     api_version: Literal["v1"] = "v1"
+    try_endpoint: Optional[bool] = None
+    """True if request came via /v1/try/* endpoints."""
 
 
 class EvaluateResponse(BaseModel):
     """Response from /v1/evaluate endpoint."""
 
     model_config = {"extra": "allow"}  # Allow extra fields from API
+
+    request_id: str
+    """Unique request ID for audit trail correlation."""
+
+    timestamp: str
+    """ISO 8601 timestamp for audit trail."""
 
     communication: CommunicationAssessment
     """Communication style analysis."""
@@ -444,6 +611,15 @@ class EvaluateResponse(BaseModel):
     recommended_reply: Optional[RecommendedReply] = None
     """Recommended reply content."""
 
+    resource_query: Optional[str] = None
+    """LLM-generated query for resource matching (e.g., 'LGBTQ youth bullying support')."""
+
+    resource_tags: Optional[List[str]] = None
+    """LLM-generated tags for specialized resources (e.g., ['cancer', 'terminal_illness'])."""
+
+    reflection: Optional[str] = None
+    """LLM reflection/reasoning (pre-scoring analysis)."""
+
     filter_result: Optional[FilterResult] = None
     """Filter stage results."""
 
@@ -454,6 +630,39 @@ class EvaluateResponse(BaseModel):
 # =============================================================================
 # Screen Types (for /v1/screen endpoint)
 # =============================================================================
+
+
+class ScreenRisk(BaseModel):
+    """A single identified risk from screen classification."""
+
+    model_config = {"extra": "allow"}
+
+    type: RiskType
+    """What type of harm."""
+
+    subject: RiskSubject
+    """Who is at risk."""
+
+    severity: Severity
+    """How severe."""
+
+    imminence: Imminence
+    """How soon."""
+
+    confidence: float = Field(ge=0.0, le=1.0)
+    """Confidence in this risk assessment (0.0-1.0)."""
+
+
+class ScreenRecommendedReply(BaseModel):
+    """Recommended supportive reply for screen response."""
+
+    model_config = {"extra": "allow"}
+
+    content: str
+    """The recommended reply content."""
+
+    source: Literal["llm_generated"]
+    """Source of the reply (always 'llm_generated')."""
 
 
 class ScreenCrisisResourcePrimary(BaseModel):
@@ -517,20 +726,23 @@ class ScreenResponse(BaseModel):
     """
     Response from /v1/screen endpoint.
 
-    Lightweight crisis screening for regulatory compliance (SB243, NY Article 47).
-    Returns independent detection flags for suicidal ideation and self-harm.
+    Multi-domain safety screening across all 9 risk types.
+    Satisfies requirements for California SB243, NY Article 47.
     """
 
     model_config = {"extra": "allow"}  # Allow extra fields from API
 
+    risks: List[ScreenRisk]
+    """Detected risks with type, subject, severity, imminence."""
+
     show_resources: bool
-    """Should crisis resources be shown? True if suicidal_ideation or self_harm detected."""
+    """Should crisis resources be shown? Derived from risks[] severity."""
 
     suicidal_ideation: bool
-    """Suicidal ideation detected (passive ideation, active ideation, or method/plan references)."""
+    """Suicidal ideation detected. Derived from risks where type='suicide'."""
 
     self_harm: bool
-    """Self-harm (NSSI) detected - tracked independently from suicidal ideation."""
+    """Self-harm (NSSI) detected. Derived from risks where type='self_harm'."""
 
     rationale: str
     """Brief rationale for assessment."""
@@ -547,12 +759,21 @@ class ScreenResponse(BaseModel):
     debug: Optional[ScreenDebugInfo] = None
     """Debug info (only if requested)."""
 
+    recommended_reply: Optional[ScreenRecommendedReply] = None
+    """Recommended supportive reply (only when requested + risks detected)."""
+
 
 class ScreenConfig(BaseModel):
     """Configuration for /v1/screen request."""
 
+    country: Optional[str] = None
+    """ISO country code for locale-specific resources (default: 'US')."""
+
     debug: Optional[bool] = None
     """Include debug info (latency, raw response)."""
+
+    include_recommended_reply: Optional[bool] = None
+    """Generate a recommended supportive reply (additional ~$0.0005 cost)."""
 
 
 # =============================================================================
@@ -620,6 +841,123 @@ def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
 def has_third_party_risk(risks: List[Risk]) -> bool:
     """Check if any third-party risk exists."""
     return any(r.subject == "other" and r.subject_confidence > 0.5 for r in risks)
+
+
+# =============================================================================
+# Resources Types (for /v1/resources/* endpoints)
+# =============================================================================
+
+
+class RankedResource(BaseModel):
+    """A resource with LLM-computed relevance ranking."""
+
+    model_config = {"extra": "allow"}
+
+    resource: CrisisResource
+    """The crisis resource."""
+
+    why: str
+    """Brief explanation of why this resource is relevant (1-2 sentences)."""
+
+    rank: int
+    """Rank position (1 = most relevant)."""
+
+
+class ResourcesResponse(BaseModel):
+    """Response from GET /v1/resources endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    country: str
+    """Country code (ISO 3166-1 alpha-2)."""
+
+    resources: List[CrisisResource]
+    """List of crisis resources."""
+
+    count: int
+    """Number of resources returned."""
+
+    primary: Optional[List[CrisisResource]] = None
+    """Primary resources matching requested scopes (when scopes provided)."""
+
+    secondary: Optional[List[CrisisResource]] = None
+    """Secondary general resources (when scopes provided)."""
+
+    scopes_requested: Optional[List[str]] = None
+    """Scopes that were requested (when provided)."""
+
+
+class ResourcesSmartResponse(BaseModel):
+    """Response from GET /v1/resources/smart endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    country: str
+    """Country code (ISO 3166-1 alpha-2)."""
+
+    query: str
+    """The search query used."""
+
+    ranked: List[RankedResource]
+    """Resources ranked by relevance to query."""
+
+    count: int
+    """Number of resources returned."""
+
+    scopes_requested: Optional[List[str]] = None
+    """Scopes that were requested (when provided)."""
+
+
+class ResourceByIdResponse(BaseModel):
+    """Response from GET /v1/resources/:id endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    resource: CrisisResource
+    """The requested crisis resource."""
+
+
+class ResourcesCountriesResponse(BaseModel):
+    """Response from GET /v1/resources/countries endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    countries: List[str]
+    """List of supported country codes (ISO 3166-1 alpha-2)."""
+
+    count: int
+    """Number of countries."""
+
+
+class DetectCountryResponse(BaseModel):
+    """Response from GET /v1/resources/detect-country endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    country_code: str
+    """Detected country code (ISO 3166-1 alpha-2), or empty string if not detected."""
+
+    country_name: str
+    """Human-readable country name, or empty string if not detected."""
+
+    error: Optional[str] = None
+    """Error message if country could not be detected."""
+
+
+class ResourcesConfig(BaseModel):
+    """Configuration for resources request."""
+
+    scopes: Optional[List[str]] = None
+    """Service scopes to filter by (e.g., 'suicide_prevention', 'domestic_violence')."""
+
+    populations: Optional[List[str]] = None
+    """Populations to filter by (e.g., 'youth', 'veterans', 'lgbtq')."""
+
+    limit: Optional[int] = None
+    """Maximum number of resources to return (max 10)."""
+
+    urgent: Optional[bool] = None
+    """Only return 24/7 urgent resources."""
 
 
 # =============================================================================
