@@ -134,21 +134,22 @@ async with AsyncNopeClient(api_key="nope_live_...") as client:
 
 > **Note**: Oversight is currently in limited access. Contact us at nope.net if you'd like access.
 
-## Crisis Resources API
+## Signpost (Crisis Resources API)
 
 Look up crisis helplines by country, with optional AI-powered ranking:
 
 ```python
 # Get resources by country
-resources = client.resources(
+resources = client.signpost(
     country="US",
-    config={"scopes": ["suicide", "crisis"], "urgent": True}
+    scopes=["suicide", "crisis"],
+    urgent=True
 )
 for resource in resources.resources:
     print(f"{resource.name}: {resource.phone}")
 
 # AI-ranked resources based on context
-ranked = client.resources_smart(
+ranked = client.signpost_smart(
     country="US",
     query="teen struggling with eating disorder"
 )
@@ -157,7 +158,7 @@ for item in ranked.ranked:
     print(f"   Why: {item.why}")
 
 # List supported countries
-countries = client.resources_countries()
+countries = client.signpost_countries()
 print(f"Supported: {', '.join(countries.countries)}")
 
 # Detect user's country from request
