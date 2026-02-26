@@ -30,6 +30,33 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def get_speaker_severity(result: EvaluateResponse) -> str:
+    """Get speaker severity from v1 or v0 response format."""
+    if result.speaker_severity is not None:
+        return result.speaker_severity
+    if result.summary is not None:
+        return result.summary.speaker_severity
+    raise ValueError("No speaker_severity in response")
+
+
+def get_speaker_imminence(result: EvaluateResponse) -> str:
+    """Get speaker imminence from v1 or v0 response format."""
+    if result.speaker_imminence is not None:
+        return result.speaker_imminence
+    if result.summary is not None:
+        return result.summary.speaker_imminence
+    raise ValueError("No speaker_imminence in response")
+
+
+def get_rationale(result: EvaluateResponse) -> str:
+    """Get rationale from v1 or primary_concerns from v0 response."""
+    if result.rationale is not None:
+        return result.rationale
+    if result.summary is not None and result.summary.primary_concerns is not None:
+        return result.summary.primary_concerns
+    return "No rationale available"
+
+
 class TestNopeClientIntegration:
     """Integration tests for synchronous NopeClient."""
 
@@ -52,20 +79,17 @@ class TestNopeClientIntegration:
 
         # Verify response structure
         assert isinstance(result, EvaluateResponse)
-        assert result.summary is not None
-        assert result.summary.speaker_severity in ("none", "mild", "moderate", "high", "critical")
-        assert result.summary.speaker_imminence in (
-            "not_applicable", "chronic", "subacute", "urgent", "emergency"
-        )
-        assert isinstance(result.confidence, float)
-        assert 0.0 <= result.confidence <= 1.0
-        assert isinstance(result.crisis_resources, list)
+
+        severity = get_speaker_severity(result)
+        imminence = get_speaker_imminence(result)
+
+        assert severity in ("none", "mild", "moderate", "high", "critical")
+        assert imminence in ("not_applicable", "chronic", "subacute", "urgent", "emergency")
         assert isinstance(result.risks, list)
 
         # Low-risk message should have none/mild severity
-        print(f"Severity: {result.summary.speaker_severity}")
-        print(f"Imminence: {result.summary.speaker_imminence}")
-        print(f"Confidence: {result.confidence}")
+        print(f"Severity: {severity}")
+        print(f"Imminence: {imminence}")
 
     def test_evaluate_moderate_risk_message(self, client):
         """Test evaluating a message with moderate risk indicators."""
@@ -79,15 +103,25 @@ class TestNopeClientIntegration:
         )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Severity: {result.summary.speaker_severity}")
-        print(f"Imminence: {result.summary.speaker_imminence}")
-        print(f"Primary concerns: {result.summary.primary_concerns}")
 
-        # Should have crisis resources for US
-        if result.summary.speaker_severity not in ("none",):
-            print(f"Crisis resources: {len(result.crisis_resources)}")
-            for resource in result.crisis_resources[:2]:
-                print(f"  - {resource.name}: {resource.phone}")
+        severity = get_speaker_severity(result)
+        imminence = get_speaker_imminence(result)
+        rationale = get_rationale(result)
+
+        print(f"Severity: {severity}")
+        print(f"Imminence: {imminence}")
+        print(f"Rationale: {rationale}")
+
+        # Check for resources (v1 format with primary/secondary or v0 format with crisis_resources)
+        if severity != "none":
+            if result.resources is not None:
+                print(f"Resources: primary + {len(result.resources.get('secondary', []))} secondary")
+                if result.resources.get('primary'):
+                    print(f"  Primary: {result.resources['primary'].get('name')}")
+            elif result.crisis_resources:
+                print(f"Crisis resources: {len(result.crisis_resources)}")
+                for resource in result.crisis_resources[:2]:
+                    print(f"  - {resource.name}: {resource.phone}")
 
     def test_evaluate_with_text_input(self, client):
         """Test evaluating plain text input."""
@@ -97,7 +131,8 @@ class TestNopeClientIntegration:
         )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Text input - Severity: {result.summary.speaker_severity}")
+        severity = get_speaker_severity(result)
+        print(f"Text input - Severity: {severity}")
 
     def test_evaluate_risk_assessments(self, client):
         """Test that risk assessments are properly parsed."""
@@ -111,14 +146,14 @@ class TestNopeClientIntegration:
             print(f"Risk type: {risk.type} (subject: {risk.subject})")
             print(f"  Severity: {risk.severity}")
             print(f"  Imminence: {risk.imminence}")
-            print(f"  Features: {risk.features}")
+            if risk.features:
+                print(f"  Features: {risk.features}")
 
             # Verify required fields
             assert risk.severity in ("none", "mild", "moderate", "high", "critical")
             assert risk.imminence in (
                 "not_applicable", "chronic", "subacute", "urgent", "emergency"
             )
-            assert isinstance(risk.features, list)
 
     def test_evaluate_different_countries(self, client):
         """Test that different countries return appropriate resources."""
@@ -129,9 +164,19 @@ class TestNopeClientIntegration:
                 messages=[{"role": "user", "content": "I need help"}],
                 config={"user_country": country},
             )
-            print(f"\n{country}: {len(result.crisis_resources)} resources")
-            if result.crisis_resources:
-                print(f"  First: {result.crisis_resources[0].name}")
+
+            # Check for resources in v1 or v0 format
+            if result.resources is not None:
+                secondary_count = len(result.resources.get('secondary', []))
+                print(f"\n{country}: 1 primary + {secondary_count} secondary resources")
+                if result.resources.get('primary'):
+                    print(f"  Primary: {result.resources['primary'].get('name')}")
+            elif result.crisis_resources:
+                print(f"\n{country}: {len(result.crisis_resources)} resources")
+                if result.crisis_resources:
+                    print(f"  First: {result.crisis_resources[0].name}")
+            else:
+                print(f"\n{country}: No resources (severity may be 'none')")
 
 
 class TestAsyncNopeClientIntegration:
@@ -157,20 +202,27 @@ class TestAsyncNopeClientIntegration:
             )
 
         assert isinstance(result, EvaluateResponse)
-        print(f"Async - Severity: {result.summary.speaker_severity}")
+        severity = get_speaker_severity(result)
+        print(f"Async - Severity: {severity}")
 
 
 class TestScreenIntegration:
-    """Integration tests for screen endpoint."""
+    """Integration tests for screen endpoint (legacy, deprecated).
+
+    Note: Screen tests require authentication because there's no /v0/try/screen endpoint.
+    Set NOPE_API_KEY to run these tests.
+    """
 
     @pytest.fixture
     def client(self):
-        """Create a client using demo mode."""
+        """Create a client with auth for screen endpoint."""
+        api_key = os.environ.get("NOPE_API_KEY")
+        if not api_key:
+            pytest.skip("NOPE_API_KEY not set - screen endpoint requires auth (no demo mode)")
         return NopeClient(
-            api_key=None,
+            api_key=api_key,
             base_url=API_URL,
             timeout=30.0,
-            demo=True,  # Use /v1/try/* endpoints (no auth required)
         )
 
     def test_screen_low_risk_message(self, client):
@@ -361,16 +413,22 @@ class TestAsyncOversightIntegration:
 
 
 class TestScreenRisksIntegration:
-    """Integration tests for expanded Screen risks array."""
+    """Integration tests for expanded Screen risks array (legacy, deprecated).
+
+    Note: Screen tests require authentication because there's no /v0/try/screen endpoint.
+    Set NOPE_API_KEY to run these tests.
+    """
 
     @pytest.fixture
     def client(self):
-        """Create a client using demo mode."""
+        """Create a client with auth for screen endpoint."""
+        api_key = os.environ.get("NOPE_API_KEY")
+        if not api_key:
+            pytest.skip("NOPE_API_KEY not set - screen endpoint requires auth (no demo mode)")
         return NopeClient(
-            api_key=None,
+            api_key=api_key,
             base_url=API_URL,
             timeout=30.0,
-            demo=True,
         )
 
     def test_screen_returns_risks_array(self, client):
@@ -406,7 +464,9 @@ class TestScreenRisksIntegration:
             assert risk.subject in ("self", "other", "unknown")
             assert risk.severity in ("none", "mild", "moderate", "high", "critical")
             assert risk.imminence in ("not_applicable", "chronic", "subacute", "urgent", "emergency")
-            assert 0.0 <= risk.confidence <= 1.0
+            # v0 screen has confidence, v1 may not
+            if risk.confidence is not None:
+                assert 0.0 <= risk.confidence <= 1.0
 
         print(f"Screen risks validated - {len(result.risks)} risk(s)")
 

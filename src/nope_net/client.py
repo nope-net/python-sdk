@@ -201,6 +201,11 @@ class NopeClient:
         """
         Lightweight crisis screening for SB243/regulatory compliance.
 
+        .. deprecated::
+            Use :meth:`evaluate` instead. The screen endpoint has been consolidated
+            into evaluate, which now uses Edge-backed classification at $0.003/call.
+            This method calls the legacy ``/v0/screen`` endpoint ($0.001/call).
+
         Fast, cheap endpoint for detecting suicidal ideation and self-harm.
         Returns independent detection flags for suicidal ideation and self-harm,
         tuned conservatively for regulatory compliance (SB243, NY Article 47).
@@ -233,6 +238,13 @@ class NopeClient:
                     print(f"Call {result.resources.primary.phone}")
             ```
         """
+        warnings.warn(
+            "screen() is deprecated. Use evaluate() instead, which now provides "
+            "Edge-backed classification at $0.003/call. screen() calls the legacy "
+            "/v0/screen endpoint.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if messages is None and text is None:
             raise ValueError("Either 'messages' or 'text' must be provided")
         if messages is not None and text is not None:
@@ -255,8 +267,8 @@ class NopeClient:
             else:
                 payload["config"] = config.model_dump(exclude_none=True)
 
-        # Make request
-        endpoint = "/v1/try/screen" if self.demo else "/v1/screen"
+        # Make request (legacy v0 endpoint)
+        endpoint = "/v0/try/screen" if self.demo else "/v0/screen"
         response = self._request("POST", endpoint, json=payload)
 
         return ScreenResponse.model_validate(response)
@@ -1013,8 +1025,16 @@ class AsyncNopeClient:
         """
         Lightweight crisis screening for SB243/regulatory compliance.
 
-        See NopeClient.screen for full documentation.
+        .. deprecated::
+            Use :meth:`evaluate` instead. See NopeClient.screen for details.
         """
+        warnings.warn(
+            "screen() is deprecated. Use evaluate() instead, which now provides "
+            "Edge-backed classification at $0.003/call. screen() calls the legacy "
+            "/v0/screen endpoint.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if messages is None and text is None:
             raise ValueError("Either 'messages' or 'text' must be provided")
         if messages is not None and text is not None:
@@ -1036,7 +1056,8 @@ class AsyncNopeClient:
             else:
                 payload["config"] = config.model_dump(exclude_none=True)
 
-        endpoint = "/v1/try/screen" if self.demo else "/v1/screen"
+        # Legacy v0 endpoint
+        endpoint = "/v0/try/screen" if self.demo else "/v0/screen"
         response = await self._request("POST", endpoint, json=payload)
 
         return ScreenResponse.model_validate(response)

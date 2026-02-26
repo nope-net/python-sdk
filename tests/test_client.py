@@ -71,43 +71,47 @@ class TestNopeClient:
                     text="test",
                 )
 
-    def test_evaluate_success(self, httpx_mock: HTTPXMock):
-        """Should parse successful response."""
+    def test_evaluate_success_v1(self, httpx_mock: HTTPXMock):
+        """Should parse successful v1 response (Edge-backed)."""
         httpx_mock.add_response(
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
                 "request_id": "req_test123",
                 "timestamp": "2024-01-15T12:00:00Z",
-                "communication": {
-                    "styles": [{"style": "direct", "confidence": 0.9}],
-                    "language": "en",
-                },
                 "risks": [
                     {
                         "subject": "self",
-                        "subject_confidence": 0.95,
                         "type": "suicide",
                         "severity": "moderate",
                         "imminence": "subacute",
-                        "confidence": 0.85,
                         "features": ["hopelessness", "passive_ideation"],
                     }
                 ],
-                "summary": {
-                    "speaker_severity": "moderate",
-                    "speaker_imminence": "subacute",
-                    "any_third_party_risk": False,
-                    "primary_concerns": "Suicidal ideation with passive thoughts",
-                },
-                "confidence": 0.85,
-                "crisis_resources": [
-                    {
+                "rationale": "User expresses hopelessness and passive suicidal ideation.",
+                "speaker_severity": "moderate",
+                "speaker_imminence": "subacute",
+                "show_resources": True,
+                "resources": {
+                    "primary": {
                         "type": "crisis_line",
                         "name": "988 Suicide & Crisis Lifeline",
                         "phone": "988",
-                    }
-                ],
+                        "why": "National crisis line for suicide prevention",
+                    },
+                    "secondary": [
+                        {
+                            "type": "text_line",
+                            "name": "Crisis Text Line",
+                            "phone": "741741",
+                            "why": "Text-based crisis support",
+                        }
+                    ],
+                },
+                "metadata": {
+                    "api_version": "v1",
+                    "input_format": "structured",
+                },
             },
         )
 
@@ -119,13 +123,18 @@ class TestNopeClient:
 
         assert result.request_id == "req_test123"
         assert result.timestamp == "2024-01-15T12:00:00Z"
-        assert result.summary.speaker_severity == "moderate"
-        assert result.summary.speaker_imminence == "subacute"
+        # v1 fields at top level
+        assert result.speaker_severity == "moderate"
+        assert result.speaker_imminence == "subacute"
+        assert result.rationale == "User expresses hopelessness and passive suicidal ideation."
+        assert result.show_resources is True
         assert len(result.risks) == 1
         assert result.risks[0].subject == "self"
         assert result.risks[0].type == "suicide"
-        assert len(result.crisis_resources) == 1
-        assert result.crisis_resources[0].phone == "988"
+        # v1 resources format
+        assert result.resources is not None
+        assert result.resources["primary"]["phone"] == "988"
+        assert len(result.resources["secondary"]) == 1
 
     def test_evaluate_with_text(self, httpx_mock: HTTPXMock):
         """Should work with text input."""
@@ -135,26 +144,23 @@ class TestNopeClient:
             json={
                 "request_id": "req_test456",
                 "timestamp": "2024-01-15T12:00:00Z",
-                "communication": {
-                    "styles": [{"style": "clinical", "confidence": 0.8}],
-                    "language": "en",
-                },
                 "risks": [],
-                "summary": {
-                    "speaker_severity": "none",
-                    "speaker_imminence": "not_applicable",
-                    "any_third_party_risk": False,
-                    "primary_concerns": "No concerns identified",
+                "rationale": "No significant risks detected.",
+                "speaker_severity": "none",
+                "speaker_imminence": "not_applicable",
+                "show_resources": False,
+                "metadata": {
+                    "api_version": "v1",
+                    "input_format": "text_blob",
                 },
-                "confidence": 0.95,
-                "crisis_resources": [],
             },
         )
 
         with NopeClient(api_key="test_key") as client:
             result = client.evaluate(text="Patient is doing well today.")
 
-        assert result.summary.speaker_severity == "none"
+        assert result.speaker_severity == "none"
+        assert result.show_resources is False
 
     def test_auth_error(self, httpx_mock: HTTPXMock):
         """Should raise NopeAuthError on 401."""
@@ -235,27 +241,23 @@ class TestAsyncNopeClient:
             assert client.api_key == "test_key"
 
     @pytest.mark.asyncio
-    async def test_evaluate_success(self, httpx_mock: HTTPXMock):
-        """Should parse successful response."""
+    async def test_evaluate_success_v1(self, httpx_mock: HTTPXMock):
+        """Should parse successful v1 response (Edge-backed)."""
         httpx_mock.add_response(
             method="POST",
             url="https://api.nope.net/v1/evaluate",
             json={
                 "request_id": "req_async789",
                 "timestamp": "2024-01-15T12:00:00Z",
-                "communication": {
-                    "styles": [{"style": "direct", "confidence": 0.8}],
-                    "language": "en",
-                },
                 "risks": [],
-                "summary": {
-                    "speaker_severity": "none",
-                    "speaker_imminence": "not_applicable",
-                    "any_third_party_risk": False,
-                    "primary_concerns": "No concerns identified",
+                "rationale": "No significant risks detected.",
+                "speaker_severity": "none",
+                "speaker_imminence": "not_applicable",
+                "show_resources": False,
+                "metadata": {
+                    "api_version": "v1",
+                    "input_format": "structured",
                 },
-                "confidence": 0.95,
-                "crisis_resources": [],
             },
         )
 
@@ -264,4 +266,5 @@ class TestAsyncNopeClient:
                 messages=[{"role": "user", "content": "Hello"}],
             )
 
-        assert result.summary.speaker_severity == "none"
+        assert result.speaker_severity == "none"
+        assert result.show_resources is False

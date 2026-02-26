@@ -177,18 +177,10 @@ class Risk(BaseModel):
     A conversation can have multiple risks (e.g., IPV victim with suicidal ideation).
     """
 
+    model_config = {"extra": "allow"}  # Allow extra fields from API
+
     subject: RiskSubject
     """Who is at risk."""
-
-    subject_confidence: float = Field(ge=0.0, le=1.0)
-    """
-    Confidence in subject determination (0.0-1.0).
-
-    Low values indicate ambiguity:
-    - 0.9+ = Clear ("I want to kill myself" → self)
-    - 0.5-0.7 = Moderate ("Asking for a friend" → likely self, but uncertain)
-    - <0.5 = Very uncertain
-    """
 
     type: RiskType
     """What type of harm."""
@@ -199,10 +191,22 @@ class Risk(BaseModel):
     imminence: Imminence
     """How soon (not_applicable → emergency)."""
 
-    confidence: float = Field(ge=0.0, le=1.0)
-    """Confidence in this risk assessment (0.0-1.0)."""
+    # Optional fields (v0 only, not present in v1 Edge-backed responses)
 
-    features: List[str]
+    subject_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    """
+    Confidence in subject determination (0.0-1.0). v0 only.
+
+    Low values indicate ambiguity:
+    - 0.9+ = Clear ("I want to kill myself" → self)
+    - 0.5-0.7 = Moderate ("Asking for a friend" → likely self, but uncertain)
+    - <0.5 = Very uncertain
+    """
+
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    """Confidence in this risk assessment (0.0-1.0). v0 only."""
+
+    features: Optional[List[str]] = None
     """Evidence features supporting this risk."""
 
 
@@ -571,7 +575,11 @@ class ResponseMetadata(BaseModel):
 
 
 class EvaluateResponse(BaseModel):
-    """Response from /v1/evaluate endpoint."""
+    """Response from /v1/evaluate endpoint.
+
+    Note: The v1 API now uses Edge-backed classification with a simplified response.
+    Some fields from legacy v0 responses may not be present.
+    """
 
     model_config = {"extra": "allow"}  # Allow extra fields from API
 
@@ -581,29 +589,48 @@ class EvaluateResponse(BaseModel):
     timestamp: str
     """ISO 8601 timestamp for audit trail."""
 
-    communication: CommunicationAssessment
-    """Communication style analysis."""
-
     risks: List[Risk]
     """Identified risks (the core of v1)."""
 
-    summary: Summary
-    """Quick summary (derived from risks)."""
+    # === v1 Edge-backed response fields ===
+
+    rationale: Optional[str] = None
+    """Chain-of-thought reasoning from Edge model (v1 only)."""
+
+    speaker_severity: Optional[Severity] = None
+    """Max severity for speaker (subject='self'). Top-level in v1, nested in summary for v0."""
+
+    speaker_imminence: Optional[Imminence] = None
+    """Max imminence for speaker (subject='self'). Top-level in v1, nested in summary for v0."""
+
+    show_resources: Optional[bool] = None
+    """Whether to show crisis resources (v1 only)."""
+
+    # === Legacy v0 response fields (may not be present in v1) ===
+
+    communication: Optional[CommunicationAssessment] = None
+    """Communication style analysis (v0 only)."""
+
+    summary: Optional[Summary] = None
+    """Quick summary derived from risks (v0 only, use speaker_severity/speaker_imminence for v1)."""
 
     legal_flags: Optional[LegalFlags] = None
-    """Legal/safety flags."""
+    """Legal/safety flags (v0 only)."""
 
     protective_factors: Optional[ProtectiveFactorsInfo] = None
-    """Protective factors."""
+    """Protective factors (v0 only)."""
 
-    confidence: float = Field(ge=0.0, le=1.0)
-    """Overall confidence in assessment."""
+    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    """Overall confidence in assessment (v0 only)."""
 
     agreement: Optional[float] = None
-    """Judge agreement (if multiple judges)."""
+    """Judge agreement if multiple judges used (v0 only)."""
 
-    crisis_resources: List[CrisisResource]
-    """Crisis resources for user's region."""
+    crisis_resources: Optional[List[CrisisResource]] = None
+    """Crisis resources for user's region (v0 format)."""
+
+    resources: Optional[dict] = None
+    """Crisis resources with 'why' explanations (v1 format). Contains primary and secondary keys."""
 
     widget_url: Optional[str] = None
     """Pre-built widget URL (only when speaker_severity > 'none')."""
@@ -612,16 +639,16 @@ class EvaluateResponse(BaseModel):
     """Recommended reply content."""
 
     resource_query: Optional[str] = None
-    """LLM-generated query for resource matching (e.g., 'LGBTQ youth bullying support')."""
+    """LLM-generated query for resource matching."""
 
     resource_tags: Optional[List[str]] = None
-    """LLM-generated tags for specialized resources (e.g., ['cancer', 'terminal_illness'])."""
+    """LLM-generated tags for specialized resources."""
 
     reflection: Optional[str] = None
-    """LLM reflection/reasoning (pre-scoring analysis)."""
+    """LLM reflection/reasoning (v0 only, use rationale for v1)."""
 
     filter_result: Optional[FilterResult] = None
-    """Filter stage results."""
+    """Filter stage results (v0 only)."""
 
     metadata: Optional[ResponseMetadata] = None
     """Metadata about the request/response."""
