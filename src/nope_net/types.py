@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 # Who is at risk
 # - self: The speaker is at risk
 # - other: Someone else is at risk (friend, family, stranger)
-# - unknown: Ambiguous - classic "asking for a friend" territory
+# - unknown: Ambiguous - classic "asking for a friend" territory (v0 only; v1 maps unknown → self)
 RiskSubject = Literal["self", "other", "unknown"]
 
 # What type of harm (9 harm-based types)
@@ -114,32 +114,36 @@ class Message(BaseModel):
 class EvaluateConfig(BaseModel):
     """Configuration for evaluation request."""
 
+    country: Optional[str] = None
+    """Country for crisis resources (ISO country code, e.g., 'US', 'GB')."""
+
     user_country: Optional[str] = None
-    """User's country for crisis resources (ISO country code)."""
+    """Deprecated: use ``country`` instead. Silently ignored by the v1 API.
+    Kept for backwards compatibility with v1/try/evaluate."""
 
     locale: Optional[str] = None
-    """Locale for language/region (e.g., 'en-US', 'es-MX')."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     user_age_band: Optional[Literal["adult", "minor", "unknown"]] = None
-    """User age band (affects response templates). Default: 'adult'."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     policy_id: Optional[str] = None
-    """Policy ID to use."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     include_resources: Optional[bool] = None
     """Include crisis resources in response. Default: true."""
 
     return_assistant_reply: Optional[bool] = None
-    """Whether to return a safe assistant reply."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     assistant_safety_mode: Optional[Literal["template", "generate"]] = None
-    """How to generate the recommended reply."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     use_multiple_judges: Optional[bool] = None
-    """Use multiple judges for higher confidence. Default: false."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     models: Optional[List[str]] = None
-    """Specify exact models to use (admin only)."""
+    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
 
     conversation_id: Optional[str] = None
     """Customer-provided conversation ID for webhook correlation."""
@@ -655,12 +659,12 @@ class EvaluateResponse(BaseModel):
 
 
 # =============================================================================
-# Screen Types (for /v1/screen endpoint)
+# Screen Types (for legacy /v0/screen endpoint — use evaluate() instead)
 # =============================================================================
 
 
 class ScreenRisk(BaseModel):
-    """A single identified risk from screen classification."""
+    """Deprecated: use evaluate() and Risk instead. For the legacy /v0/screen endpoint."""
 
     model_config = {"extra": "allow"}
 
@@ -725,7 +729,7 @@ class ScreenCrisisResourceSecondary(BaseModel):
 
 
 class ScreenCrisisResources(BaseModel):
-    """Crisis resources returned by /v1/screen endpoint."""
+    """Deprecated: crisis resources from legacy /v0/screen endpoint."""
 
     primary: ScreenCrisisResourcePrimary
     secondary: List[ScreenCrisisResourceSecondary]
@@ -742,7 +746,7 @@ class ScreenDisplayText(BaseModel):
 
 
 class ScreenDebugInfo(BaseModel):
-    """Debug information for /v1/screen (only if requested)."""
+    """Deprecated: debug information from legacy /v0/screen."""
 
     model: str
     latency_ms: int
@@ -751,7 +755,8 @@ class ScreenDebugInfo(BaseModel):
 
 class ScreenResponse(BaseModel):
     """
-    Response from /v1/screen endpoint.
+    Deprecated: use evaluate() and EvaluateResponse instead.
+    Response from legacy /v0/screen endpoint.
 
     Multi-domain safety screening across all 9 risk types.
     Satisfies requirements for California SB243, NY Article 47.
@@ -791,7 +796,7 @@ class ScreenResponse(BaseModel):
 
 
 class ScreenConfig(BaseModel):
-    """Configuration for /v1/screen request."""
+    """Deprecated: use evaluate() instead. Configuration for legacy /v0/screen endpoint."""
 
     country: Optional[str] = None
     """ISO country code for locale-specific resources (default: 'US')."""
@@ -833,9 +838,14 @@ def calculate_speaker_severity(risks: List[Risk]) -> Severity:
     """
     Calculate speaker severity from risks array.
 
-    Only considers risks where subject='self' and subject_confidence > 0.5
+    Only considers risks where subject='self'.
+    For v0 responses with subject_confidence, filters to confidence > 0.5.
+    For v1 responses (no subject_confidence), all self-risks are included.
     """
-    speaker_risks = [r for r in risks if r.subject == "self" and r.subject_confidence > 0.5]
+    speaker_risks = [
+        r for r in risks
+        if r.subject == "self" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+    ]
 
     if not speaker_risks:
         return "none"
@@ -850,8 +860,15 @@ def calculate_speaker_severity(risks: List[Risk]) -> Severity:
 
 
 def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
-    """Calculate speaker imminence from risks array."""
-    speaker_risks = [r for r in risks if r.subject == "self" and r.subject_confidence > 0.5]
+    """
+    Calculate speaker imminence from risks array.
+
+    For v1 responses (no subject_confidence), all self-risks are included.
+    """
+    speaker_risks = [
+        r for r in risks
+        if r.subject == "self" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+    ]
 
     if not speaker_risks:
         return "not_applicable"
@@ -866,8 +883,15 @@ def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
 
 
 def has_third_party_risk(risks: List[Risk]) -> bool:
-    """Check if any third-party risk exists."""
-    return any(r.subject == "other" and r.subject_confidence > 0.5 for r in risks)
+    """
+    Check if any third-party risk exists.
+
+    For v1 responses (no subject_confidence), all other-risks are included.
+    """
+    return any(
+        r.subject == "other" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+        for r in risks
+    )
 
 
 # =============================================================================

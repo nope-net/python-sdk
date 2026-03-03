@@ -14,9 +14,9 @@ Example:
         config={"user_country": "US"}
     )
 
-    print(f"Severity: {result.summary.speaker_severity}")
-    for resource in result.crisis_resources:
-        print(f"  {resource.name}: {resource.phone}")
+    print(f"Severity: {result.speaker_severity}")
+    if result.resources and result.resources.get("primary"):
+        print(f"  {result.resources['primary']['name']}: {result.resources['primary']['phone']}")
     ```
 """
 
@@ -111,7 +111,7 @@ from .webhook import (
     WebhookConversation,
 )
 
-__version__ = "1.3.1"
+__version__ = "2.1.0"
 
 __all__ = [
     # Clients

@@ -52,7 +52,7 @@ class NopeClient:
             messages=[{"role": "user", "content": "I'm feeling down"}],
             config={"user_country": "US"}
         )
-        print(result.summary.speaker_severity)
+        print(result.speaker_severity)
         ```
     """
 
@@ -129,7 +129,7 @@ class NopeClient:
             proposed_response: Optional proposed AI response to evaluate for appropriateness.
 
         Returns:
-            EvaluateResponse with risks, summary, communication, crisis resources, etc.
+            EvaluateResponse with risks, speaker_severity, rationale, resources, etc.
 
         Raises:
             NopeAuthError: Invalid or missing API key.
@@ -149,10 +149,10 @@ class NopeClient:
                 config={"user_country": "US"}
             )
 
-            if result.summary.speaker_severity in ("high", "critical"):
+            if result.speaker_severity in ("high", "critical"):
                 print("High risk detected")
-                for resource in result.crisis_resources:
-                    print(f"  {resource.name}: {resource.phone}")
+                if result.resources and result.resources.get("primary"):
+                    print(f"  {result.resources['primary']['name']}: {result.resources['primary']['phone']}")
             ```
         """
         if messages is None and text is None:
@@ -173,11 +173,17 @@ class NopeClient:
 
         if config is not None:
             if isinstance(config, dict):
-                payload["config"] = config
+                config_dict = dict(config)
             else:
-                payload["config"] = config.model_dump(exclude_none=True)
+                config_dict = config.model_dump(exclude_none=True)
         else:
-            payload["config"] = {}
+            config_dict = {}
+
+        # Map deprecated user_country → country for v1 API
+        if config_dict.get("user_country") and not config_dict.get("country"):
+            config_dict["country"] = config_dict["user_country"]
+
+        payload["config"] = config_dict
 
         if user_context is not None:
             payload["user_context"] = user_context
@@ -245,6 +251,13 @@ class NopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
+
+        if self.demo:
+            raise ValueError(
+                "screen() is not available in demo mode. Use evaluate() instead — "
+                "it uses the same Edge-backed classification and is available via /v1/try/evaluate."
+            )
+
         if messages is None and text is None:
             raise ValueError("Either 'messages' or 'text' must be provided")
         if messages is not None and text is not None:
@@ -267,9 +280,8 @@ class NopeClient:
             else:
                 payload["config"] = config.model_dump(exclude_none=True)
 
-        # Make request (legacy v0 endpoint)
-        endpoint = "/v0/try/screen" if self.demo else "/v0/screen"
-        response = self._request("POST", endpoint, json=payload)
+        # Legacy v0 endpoint (requires authentication)
+        response = self._request("POST", "/v0/screen", json=payload)
 
         return ScreenResponse.model_validate(response)
 
@@ -915,7 +927,7 @@ class AsyncNopeClient:
                 messages=[{"role": "user", "content": "I'm feeling down"}],
                 config={"user_country": "US"}
             )
-            print(result.summary.speaker_severity)
+            print(result.speaker_severity)
         ```
     """
 
@@ -998,11 +1010,17 @@ class AsyncNopeClient:
 
         if config is not None:
             if isinstance(config, dict):
-                payload["config"] = config
+                config_dict = dict(config)
             else:
-                payload["config"] = config.model_dump(exclude_none=True)
+                config_dict = config.model_dump(exclude_none=True)
         else:
-            payload["config"] = {}
+            config_dict = {}
+
+        # Map deprecated user_country → country for v1 API
+        if config_dict.get("user_country") and not config_dict.get("country"):
+            config_dict["country"] = config_dict["user_country"]
+
+        payload["config"] = config_dict
 
         if user_context is not None:
             payload["user_context"] = user_context
@@ -1035,6 +1053,13 @@ class AsyncNopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
+
+        if self.demo:
+            raise ValueError(
+                "screen() is not available in demo mode. Use evaluate() instead — "
+                "it uses the same Edge-backed classification and is available via /v1/try/evaluate."
+            )
+
         if messages is None and text is None:
             raise ValueError("Either 'messages' or 'text' must be provided")
         if messages is not None and text is not None:
@@ -1056,9 +1081,8 @@ class AsyncNopeClient:
             else:
                 payload["config"] = config.model_dump(exclude_none=True)
 
-        # Legacy v0 endpoint
-        endpoint = "/v0/try/screen" if self.demo else "/v0/screen"
-        response = await self._request("POST", endpoint, json=payload)
+        # Legacy v0 endpoint (requires authentication)
+        response = await self._request("POST", "/v0/screen", json=payload)
 
         return ScreenResponse.model_validate(response)
 
