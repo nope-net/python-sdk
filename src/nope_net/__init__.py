@@ -73,6 +73,10 @@ from .types import (
     ResourceByIdResponse,
     ResourcesCountriesResponse,
     DetectCountryResponse,
+    # Ocular types
+    OcularResponse,
+    OcularRisk,
+    OcularComposites,
     # Oversight types
     ConcernLevel,
     Trajectory,

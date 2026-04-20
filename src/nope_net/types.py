@@ -1345,3 +1345,73 @@ class OversightIngestResponse(BaseModel):
 
     errors: Optional[List[OversightIngestError]] = None
     """Per-conversation errors (if any)."""
+
+
+# =============================================================================
+# Ocular (behavioral risk assessment — /v1/ocular)
+# =============================================================================
+
+
+class OcularRisk(BaseModel):
+    """
+    Verdict-level risk profile from Ocular.
+
+    Contains 8 user-risk axes, 4 AI-behavior axes, imminence, fiction-framing,
+    corroboration, and a top-line verdict. All axis + corroboration scores are
+    accompanied by a human-readable `*_level` string.
+
+    Individual behavioral code identities are intentionally not exposed — the
+    aggregated axis scores and levels are the customer surface. New axes added
+    by future Ocular versions will appear here automatically (extra=allow).
+    """
+
+    model_config = {"extra": "allow"}
+
+    verdict: Literal["clear", "watch", "concern", "crisis"]
+    """Top-line verdict."""
+
+    subject: Literal["self", "other", "unknown"]
+    """Who is at risk. 'self' = speaker; 'other' = third party; 'unknown' = ambiguous third-person disclosure."""
+
+
+class OcularComposites(BaseModel):
+    """Composite signals — name-keyed (no individual code identifiers)."""
+
+    model_config = {"extra": "allow"}
+
+    imminence: float = 0.0
+    user_crisis: float = 0.0
+    user_mania: float = 0.0
+    ai_crisis_failure: float = 0.0
+    ai_harmful_advice: float = 0.0
+    ai_manipulation: float = 0.0
+    ai_safeguarding: float = 0.0
+
+
+class OcularResponse(BaseModel):
+    """Response from POST /v1/ocular."""
+
+    model_config = {"extra": "allow"}
+
+    version: str
+    """Ocular model version (e.g. 'H31_c42_vllm')."""
+
+    concern: bool
+    """Any risk axis above the concern threshold."""
+
+    crisis: bool
+    """Top-line crisis verdict."""
+
+    crisis_score: float
+    """Crisis score 0-1."""
+
+    crisis_level: Literal["none", "mild", "moderate", "high", "critical"]
+
+    risk: OcularRisk
+    """Verdict-level risk profile with axes and levels."""
+
+    composites: OcularComposites
+    """Composite signals."""
+
+    format: Optional[str] = None
+    inference_ms: Optional[int] = None

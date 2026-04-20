@@ -23,6 +23,7 @@ from .types import (
     EvaluateConfig,
     EvaluateResponse,
     Message,
+    OcularResponse,
     OversightAnalyzeConfig,
     OversightAnalyzeResponse,
     OversightConversation,
@@ -284,6 +285,64 @@ class NopeClient:
         response = self._request("POST", "/v0/screen", json=payload)
 
         return ScreenResponse.model_validate(response)
+
+    def ocular(
+        self,
+        *,
+        messages: Optional[List[Union[Message, dict]]] = None,
+        text: Optional[str] = None,
+    ) -> OcularResponse:
+        """
+        Behavioral risk assessment via Ocular.
+
+        Returns a verdict-level profile — 8 user-risk axes, 4 AI-behavior
+        axes, imminence, fiction framing, corroboration, and a top-line
+        verdict. Individual behavioral code identities are not exposed.
+
+        Either ``messages`` or ``text`` must be provided, but not both.
+
+        Args:
+            messages: Conversation messages (each {role: 'user'|'assistant', content: str}).
+            text: Plain text input (alternative to messages).
+
+        Returns:
+            OcularResponse with ``risk`` (verdict, subject, axes + levels),
+            ``composites``, and top-line ``crisis`` / ``crisis_score``.
+
+        Raises:
+            NopeAuthError: Invalid or missing API key.
+            NopeValidationError: Invalid request payload.
+            NopeRateLimitError: Rate limit exceeded.
+            NopeServerError: Upstream (gex44) gateway error.
+            NopeConnectionError: Connection failed.
+
+        Example:
+            ```python
+            result = client.ocular(
+                messages=[{"role": "user", "content": "I feel hopeless"}]
+            )
+            print(result.risk.verdict, result.risk.subject)
+            # watch self
+            ```
+
+        Note:
+            Currently free (beta). Rate-limited via the standard /v1/* limiter.
+        """
+        if messages is None and text is None:
+            raise ValueError("Either 'messages' or 'text' must be provided")
+        if messages is not None and text is not None:
+            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
+
+        payload: dict = {}
+        if messages is not None:
+            payload["messages"] = [
+                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
+            ]
+        if text is not None:
+            payload["text"] = text
+
+        response = self._request("POST", "/v1/ocular", json=payload)
+        return OcularResponse.model_validate(response)
 
     def oversight_analyze(
         self,
@@ -1085,6 +1144,33 @@ class AsyncNopeClient:
         response = await self._request("POST", "/v0/screen", json=payload)
 
         return ScreenResponse.model_validate(response)
+
+    async def ocular(
+        self,
+        *,
+        messages: Optional[List[Union[Message, dict]]] = None,
+        text: Optional[str] = None,
+    ) -> OcularResponse:
+        """
+        Behavioral risk assessment via Ocular (async).
+
+        See NopeClient.ocular for full documentation.
+        """
+        if messages is None and text is None:
+            raise ValueError("Either 'messages' or 'text' must be provided")
+        if messages is not None and text is not None:
+            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
+
+        payload: dict = {}
+        if messages is not None:
+            payload["messages"] = [
+                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
+            ]
+        if text is not None:
+            payload["text"] = text
+
+        response = await self._request("POST", "/v1/ocular", json=payload)
+        return OcularResponse.model_validate(response)
 
     async def oversight_analyze(
         self,
