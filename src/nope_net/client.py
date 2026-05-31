@@ -5,7 +5,7 @@ Main client for interacting with the NOPE API.
 """
 
 import warnings
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 import httpx
 
@@ -291,29 +291,41 @@ class NopeClient:
         *,
         messages: Optional[List[Union[Message, dict]]] = None,
         text: Optional[str] = None,
+        thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
     ) -> OcularResponse:
         """
         Behavioral risk assessment via Ocular.
 
-        Returns a verdict-level profile — 8 user-risk axes, 4 AI-behavior
-        axes, imminence, fiction framing, corroboration, and a top-line
-        verdict. Individual behavioral code identities are not exposed.
+        Returns a continuous ``salience`` score in [0, 1] plus structural
+        axes — 8 user-risk axes under ``signals.user``, 4 AI-behavior axes
+        under ``signals.ai``, an ``imminence`` axis, and ``fiction`` /
+        ``authenticity`` context modulators. Individual behavioral code
+        identities are not exposed.
+
+        Customer code keys decisions off ``salience``: pick the cutoff that
+        fits your action. Reference thresholds (T_WATCH=0.30, T_DANGER=0.60)
+        match the band view in dashboard.nope.net/ocular.
 
         Either ``messages`` or ``text`` must be provided, but not both.
 
         Args:
             messages: Conversation messages (each {role: 'user'|'assistant', content: str}).
             text: Plain text input (alternative to messages).
+            thoroughness: How many ensemble variants to run — 'fast' (1 variant,
+                lowest latency), 'auto' (server default), 'thorough' (multiple
+                variants, populates ``stability``). Omit for the server default.
 
         Returns:
-            OcularResponse with ``risk`` (verdict, subject, axes + levels),
-            ``composites``, and top-line ``crisis`` / ``crisis_score``.
+            OcularResponse with top-level ``salience``, ``subject``, ``imminence``,
+            ``fiction``, ``authenticity``; ``signals`` (per-axis level + score);
+            ``stability`` (when multi-variant); ``meta`` (model version, inference
+            time); and ``trajectory`` (per-turn salience when ≥2 turns).
 
         Raises:
             NopeAuthError: Invalid or missing API key.
             NopeValidationError: Invalid request payload.
             NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Upstream (gex44) gateway error.
+            NopeServerError: Upstream gateway error.
             NopeConnectionError: Connection failed.
 
         Example:
@@ -321,8 +333,11 @@ class NopeClient:
             result = client.ocular(
                 messages=[{"role": "user", "content": "I feel hopeless"}]
             )
-            print(result.risk.verdict, result.risk.subject)
-            # watch self
+            print(result.salience, result.subject)
+            # 0.42 self
+            if result.signals.user.get("suicide", None) and \
+               result.signals.user["suicide"].score > 0.5:
+                escalate(...)
             ```
 
         Note:
@@ -340,6 +355,8 @@ class NopeClient:
             ]
         if text is not None:
             payload["text"] = text
+        if thoroughness is not None:
+            payload["thoroughness"] = thoroughness
 
         response = self._request("POST", "/v1/ocular", json=payload)
         return OcularResponse.model_validate(response)
@@ -1150,6 +1167,7 @@ class AsyncNopeClient:
         *,
         messages: Optional[List[Union[Message, dict]]] = None,
         text: Optional[str] = None,
+        thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
     ) -> OcularResponse:
         """
         Behavioral risk assessment via Ocular (async).
@@ -1168,6 +1186,8 @@ class AsyncNopeClient:
             ]
         if text is not None:
             payload["text"] = text
+        if thoroughness is not None:
+            payload["thoroughness"] = thoroughness
 
         response = await self._request("POST", "/v1/ocular", json=payload)
         return OcularResponse.model_validate(response)

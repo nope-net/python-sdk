@@ -75,8 +75,11 @@ from .types import (
     DetectCountryResponse,
     # Ocular types
     OcularResponse,
-    OcularRisk,
-    OcularComposites,
+    OcularAxis,
+    OcularSignals,
+    OcularStability,
+    OcularTrajectoryEntry,
+    OcularMeta,
     # Oversight types
     ConcernLevel,
     Trajectory,
@@ -171,6 +174,13 @@ __all__ = [
     "ResourceByIdResponse",
     "ResourcesCountriesResponse",
     "DetectCountryResponse",
+    # Ocular types
+    "OcularResponse",
+    "OcularAxis",
+    "OcularSignals",
+    "OcularStability",
+    "OcularTrajectoryEntry",
+    "OcularMeta",
     # Oversight types
     "ConcernLevel",
     "Trajectory",

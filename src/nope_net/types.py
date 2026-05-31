@@ -8,7 +8,7 @@ Uses orthogonal subject/type separation:
 - WHAT type of harm (type: suicide | violence | abuse | ...)
 """
 
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -1350,68 +1350,139 @@ class OversightIngestResponse(BaseModel):
 # =============================================================================
 # Ocular (behavioral risk assessment — /v1/ocular)
 # =============================================================================
+#
+# The customer-facing /v1/ocular response models the post-filter surface the
+# gateway emits (see `OcularPublicResponse` in the API repo for the wire spec
+# this mirrors). Individual head-code identifiers are stripped by the gateway
+# and are not part of the SDK surface.
 
 
-class OcularRisk(BaseModel):
-    """
-    Verdict-level risk profile from Ocular.
+class OcularAxis(BaseModel):
+    """Per-axis output — level enum + raw score in [0, 1].
 
-    Contains 8 user-risk axes, 4 AI-behavior axes, imminence, fiction-framing,
-    corroboration, and a top-line verdict. All axis + corroboration scores are
-    accompanied by a human-readable `*_level` string.
-
-    Individual behavioral code identities are intentionally not exposed — the
-    aggregated axis scores and levels are the customer surface. New axes added
-    by future Ocular versions will appear here automatically (extra=allow).
+    The `level` string is one of: minimal, low, moderate, high, critical
+    (imminence may also return `not_applicable`). Forward-compatible with
+    future levels via the enum being a free `str`.
     """
 
     model_config = {"extra": "allow"}
 
-    verdict: Literal["clear", "watch", "concern", "crisis"]
-    """Top-line verdict."""
-
-    subject: Literal["self", "other", "unknown"]
-    """Who is at risk. 'self' = speaker; 'other' = third party; 'unknown' = ambiguous third-person disclosure."""
+    level: str
+    score: float
 
 
-class OcularComposites(BaseModel):
-    """Composite signals — name-keyed (no individual code identifiers)."""
+class OcularSignals(BaseModel):
+    """Per-axis signal groups: 8 user-risk axes + 4 AI-behavior axes.
+
+    user axes: suicide, self_harm, harm_to_others, abuse, sexual_violence,
+    exploitation, stalking, self_neglect.
+
+    ai axes: harm_provision, emotional_failure, manipulation,
+    safeguarding_failure (populated when assistant turns are present).
+    """
 
     model_config = {"extra": "allow"}
 
+    user: Dict[str, OcularAxis] = Field(default_factory=dict)
+    ai: Dict[str, OcularAxis] = Field(default_factory=dict)
+
+
+class OcularStability(BaseModel):
+    """Per-axis stability scores in [0, 1] — higher = more confident.
+
+    Same nesting shape as `signals` plus a top-level `imminence`. Returned
+    only when Ocular produced multiple variants on the call; otherwise the
+    response carries `stability: null`.
+    """
+
+    model_config = {"extra": "allow"}
+
+    user: Dict[str, float] = Field(default_factory=dict)
+    ai: Dict[str, float] = Field(default_factory=dict)
     imminence: float = 0.0
-    user_crisis: float = 0.0
-    user_mania: float = 0.0
-    ai_crisis_failure: float = 0.0
-    ai_harmful_advice: float = 0.0
-    ai_manipulation: float = 0.0
-    ai_safeguarding: float = 0.0
 
 
-class OcularResponse(BaseModel):
-    """Response from POST /v1/ocular."""
+class OcularTrajectoryEntry(BaseModel):
+    """Per-turn entry — minimal surface, no head codes.
+
+    `salience` is the same continuous score as the top-level field, computed
+    per turn so callers can plot the conversation arc.
+    """
+
+    model_config = {"extra": "allow"}
+
+    role: str
+    turn: int
+    salience: float
+
+
+class OcularMeta(BaseModel):
+    """Response metadata.
+
+    `version` is the Ocular model build identifier. `windowed`/`windows`/
+    `truncated` are present only when the input was windowed at the gateway.
+    """
 
     model_config = {"extra": "allow"}
 
     version: str
-    """Ocular model version (e.g. 'H31_c42_vllm')."""
+    inference_ms: int
+    windowed: Optional[bool] = None
+    windows: Optional[int] = None
+    truncated: Optional[bool] = None
 
-    concern: bool
-    """Any risk axis above the concern threshold."""
 
-    crisis: bool
-    """Top-line crisis verdict."""
+class OcularResponse(BaseModel):
+    """Response from POST /v1/ocular.
 
-    crisis_score: float
-    """Crisis score 0-1."""
+    The customer decision surface is the continuous `salience` score in
+    [0, 1] plus the structural axes under `signals.user.*` (8 axes) and
+    `signals.ai.*` (4 axes). Pick the threshold that fits your downstream
+    action; published guidance uses T_WATCH=0.30 and T_DANGER=0.60 as
+    reference cutoffs (see `docs.nope.net/ocular/risk-interpretation`).
 
-    crisis_level: Literal["none", "mild", "moderate", "high", "critical"]
+    `subject` ("self" / "other" / "unknown") identifies who the speaker-side
+    risk pertains to; `imminence` is a separate axis. `fiction` and
+    `authenticity` are context modulators already factored into `salience`
+    and per-axis levels server-side — surface them for inspection, not
+    re-aggregation.
 
-    risk: OcularRisk
-    """Verdict-level risk profile with axes and levels."""
+    `stability` is only populated when Ocular produced multiple variants
+    on the call. `trajectory` is present when the input had ≥2 turns; each
+    entry carries the per-turn salience for plotting.
+    """
 
-    composites: OcularComposites
-    """Composite signals."""
+    model_config = {"extra": "allow"}
 
-    format: Optional[str] = None
-    inference_ms: Optional[int] = None
+    salience: float
+    """Continuous severity score in [0, 1]. The customer decision contract."""
+
+    subject: str
+    """Who the speaker-side risk pertains to — 'self' / 'other' / 'unknown'."""
+
+    imminence: OcularAxis
+    """How urgent the concern is (separate axis, not part of `signals`)."""
+
+    fiction: float
+    """Roleplay/fiction-framing strength in [0, 1] (informational)."""
+
+    authenticity: float
+    """Authenticity-of-distress signal in [0, 1] (informational)."""
+
+    signals: OcularSignals
+    """8 user-risk axes + 4 AI-behavior axes, each with level + score."""
+
+    thoroughness: Literal["fast", "auto", "thorough"]
+    """Which ensemble depth the call ran at."""
+
+    confidence: Optional[float] = None
+    """Aggregate confidence in [0, 1] across the variants produced (null when single-variant)."""
+
+    stability: Optional[OcularStability] = None
+    """Per-axis stability across variants — null when single-variant."""
+
+    meta: OcularMeta
+    """Response metadata: model version, inference time, windowing flags."""
+
+    trajectory: Optional[List[OcularTrajectoryEntry]] = None
+    """Per-turn salience trail when the input had ≥2 turns."""
