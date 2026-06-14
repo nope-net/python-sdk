@@ -73,6 +73,10 @@ from .types import (
     ResourceByIdResponse,
     ResourcesCountriesResponse,
     DetectCountryResponse,
+    # Signpost search types
+    SignpostSearchResult,
+    SignpostSearchTiming,
+    SignpostSearchResponse,
     # Ocular types
     OcularResponse,
     OcularAxis,
@@ -80,6 +84,16 @@ from .types import (
     OcularStability,
     OcularTrajectoryEntry,
     OcularMeta,
+    # Steer types
+    SteerResponse,
+    SteerStages,
+    SteerPreprocessStage,
+    SteerScreenStage,
+    SteerVerifyStage,
+    SteerCannotComply,
+    SteerConversationContext,
+    PromptQuality,
+    PromptQualityDimensions,
     # Oversight types
     ConcernLevel,
     Trajectory,
@@ -118,7 +132,7 @@ from .webhook import (
     WebhookConversation,
 )
 
-__version__ = "2.1.0"
+__version__ = "2.3.0"
 
 __all__ = [
     # Clients
@@ -174,6 +188,10 @@ __all__ = [
     "ResourceByIdResponse",
     "ResourcesCountriesResponse",
     "DetectCountryResponse",
+    # Signpost search types
+    "SignpostSearchResult",
+    "SignpostSearchTiming",
+    "SignpostSearchResponse",
     # Ocular types
     "OcularResponse",
     "OcularAxis",
@@ -181,6 +199,16 @@ __all__ = [
     "OcularStability",
     "OcularTrajectoryEntry",
     "OcularMeta",
+    # Steer types
+    "SteerResponse",
+    "SteerStages",
+    "SteerPreprocessStage",
+    "SteerScreenStage",
+    "SteerVerifyStage",
+    "SteerCannotComply",
+    "SteerConversationContext",
+    "PromptQuality",
+    "PromptQualityDimensions",
     # Oversight types
     "ConcernLevel",
     "Trajectory",

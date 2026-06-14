@@ -225,6 +225,145 @@ class TestNopeClient:
 
         assert exc_info.value.status_code == 500
 
+    def test_steer_requires_system_prompt(self):
+        """Should raise ValueError when system_prompt is empty."""
+        with NopeClient(api_key="test_key") as client:
+            with pytest.raises(ValueError, match="'system_prompt' is required"):
+                client.steer(system_prompt="", proposed_response="hi")
+
+    def test_steer_success(self, httpx_mock: HTTPXMock):
+        """Should POST snake_case payload and parse a REDEEMED response."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://api.nope.net/v1/steer",
+            json={
+                "outcome": "REDEEMED",
+                "compliant": False,
+                "modified": True,
+                "response": "I'm a cooking assistant — happy to help with recipes!",
+                "stages": {
+                    "preprocess": {
+                        "red_lines": 1,
+                        "watch_items": 0,
+                        "cached": False,
+                        "latency_ms": 5,
+                    },
+                    "screen": {
+                        "passed": False,
+                        "hits": 1,
+                        "misses": 0,
+                        "evasion_patterns": [],
+                        "latency_ms": 2,
+                    },
+                    "verify": {
+                        "exit_point": "ANALYSIS",
+                        "triage_confidence": 60,
+                        "analysis_score": 0.4,
+                        "analysis_compliant": False,
+                        "latency_ms": 120,
+                    },
+                },
+                "request_id": "req_steer1",
+                "timestamp": "2024-01-15T12:00:00Z",
+                "total_latency_ms": 130,
+            },
+        )
+
+        with NopeClient(api_key="test_key") as client:
+            result = client.steer(
+                system_prompt="You are a cooking assistant. Only answer cooking questions.",
+                proposed_response="The capital of France is Paris.",
+                messages=[{"role": "user", "content": "What is the capital of France?"}],
+                include_audit=True,
+            )
+
+        assert result.outcome == "REDEEMED"
+        assert result.modified is True
+        assert result.response.startswith("I'm a cooking assistant")
+        assert result.stages.verify.exit_point == "ANALYSIS"
+        assert result.stages.verify.analysis_score == 0.4
+        assert result.stages.verify.analysis_compliant is False
+
+        request = httpx_mock.get_requests()[0]
+        import json
+
+        body = json.loads(request.content)
+        assert body["system_prompt"].startswith("You are a cooking assistant")
+        assert body["proposed_response"] == "The capital of France is Paris."
+        assert body["include_audit"] is True
+        assert len(body["messages"]) == 1
+
+    def test_steer_demo_mode_uses_try_endpoint(self, httpx_mock: HTTPXMock):
+        """Demo mode should call /v1/try/steer."""
+        httpx_mock.add_response(
+            method="POST",
+            url="https://api.nope.net/v1/try/steer",
+            json={
+                "outcome": "COMPLIANT",
+                "compliant": True,
+                "modified": False,
+                "response": "ok",
+                "stages": {
+                    "preprocess": {"red_lines": 0, "watch_items": 0, "cached": True, "latency_ms": 1},
+                    "screen": {
+                        "passed": True,
+                        "hits": 0,
+                        "misses": 0,
+                        "evasion_patterns": [],
+                        "latency_ms": 1,
+                    },
+                    "verify": {"exit_point": "TRIAGE", "triage_confidence": 99, "latency_ms": 10},
+                },
+                "request_id": "req_steer2",
+                "timestamp": "2024-01-15T12:00:00Z",
+                "total_latency_ms": 12,
+            },
+        )
+
+        with NopeClient(demo=True) as client:
+            result = client.steer(system_prompt="be nice", proposed_response="hello")
+
+        assert result.outcome == "COMPLIANT"
+        assert str(httpx_mock.get_requests()[0].url) == "https://api.nope.net/v1/try/steer"
+
+    def test_signpost_search_requires_query(self):
+        """Should raise ValueError when query is empty."""
+        with NopeClient(api_key="test_key") as client:
+            with pytest.raises(ValueError, match="'query' is required"):
+                client.signpost_search(query="")
+
+    def test_signpost_search_success(self, httpx_mock: HTTPXMock):
+        """Should GET /v1/signpost/search with query params and parse results."""
+        httpx_mock.add_response(
+            method="GET",
+            url="https://api.nope.net/v1/signpost/search?query=lgbtq+support&country=US&limit=5&threshold=0.4",
+            json={
+                "query": "lgbtq support",
+                "country": "US",
+                "results": [
+                    {
+                        "type": "crisis_line",
+                        "name": "Trevor Project",
+                        "phone": "1-866-488-7386",
+                        "similarity": 0.82,
+                        "id": "abc",
+                    }
+                ],
+                "count": 1,
+                "timing": {"embed_ms": 12, "search_ms": 8, "total_ms": 20},
+            },
+        )
+
+        with NopeClient(api_key="test_key") as client:
+            result = client.signpost_search(
+                query="lgbtq support", country="us", limit=5, threshold=0.4
+            )
+
+        assert result.count == 1
+        assert result.results[0].similarity == 0.82
+        assert result.results[0].phone == "1-866-488-7386"
+        assert result.timing.total_ms == 20
+
 
 class TestAsyncNopeClient:
     """Tests for async NopeClient."""

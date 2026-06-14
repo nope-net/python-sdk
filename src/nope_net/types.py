@@ -1486,3 +1486,234 @@ class OcularResponse(BaseModel):
 
     trajectory: Optional[List[OcularTrajectoryEntry]] = None
     """Per-turn salience trail when the input had ≥2 turns."""
+
+
+# =============================================================================
+# Signpost Search (vector semantic search — GET /v1/signpost/search)
+# =============================================================================
+
+
+class SignpostSearchResult(CrisisResource):
+    """A single semantic-search hit.
+
+    Carries all the flattened `CrisisResource` fields (the gateway lifts
+    contact methods to the top level and computes `open_status`) plus the
+    vector `similarity` score for this query.
+    """
+
+    model_config = {"extra": "allow"}
+
+    id: Optional[str] = None
+    """Database UUID of the resource."""
+
+    similarity: Optional[float] = None
+    """Vector similarity to the query in [0, 1]; higher = more relevant."""
+
+
+class SignpostSearchTiming(BaseModel):
+    """Timing breakdown for a semantic search."""
+
+    model_config = {"extra": "allow"}
+
+    embed_ms: float = 0.0
+    """Time spent embedding the query (ms)."""
+
+    search_ms: float = 0.0
+    """Time spent on the vector search (ms)."""
+
+    total_ms: float = 0.0
+    """Total time (embed + search) (ms)."""
+
+
+class SignpostSearchResponse(BaseModel):
+    """Response from GET /v1/signpost/search."""
+
+    model_config = {"extra": "allow"}
+
+    query: str
+    """The search query that was run."""
+
+    country: Optional[str] = None
+    """Country filter applied, or None when unfiltered."""
+
+    results: List[SignpostSearchResult] = Field(default_factory=list)
+    """Resources ranked by semantic similarity to the query."""
+
+    count: int = 0
+    """Number of results returned."""
+
+    timing: Optional[SignpostSearchTiming] = None
+    """Timing breakdown for the search."""
+
+
+# =============================================================================
+# Steer (system-prompt compliance verification — POST /v1/steer)
+# =============================================================================
+
+# Verification outcome:
+# - COMPLIANT: the proposed response already follows the system prompt.
+# - REDEEMED: the response violated a rule and was rewritten; use `response`.
+# - CANNOT_COMPLY: the system prompt itself is unprocessable; `response` is
+#   empty and `compliant` is False (see `cannot_comply`).
+SteerOutcome = Literal["COMPLIANT", "REDEEMED", "CANNOT_COMPLY"]
+
+# Why a system prompt was rejected as unprocessable.
+SteerCannotComplyCategory = Literal[
+    "violence", "csam", "terrorism", "safety_circumvention", "other"
+]
+
+
+class PromptQualityDimensions(BaseModel):
+    """Per-dimension prompt-quality scores."""
+
+    model_config = {"extra": "allow"}
+
+    specificity: float = 0.0
+    extractability: float = 0.0
+    consistency: float = 0.0
+    completeness: float = 0.0
+    testability: float = 0.0
+    actionability: Optional[float] = None
+
+
+class PromptQuality(BaseModel):
+    """System-prompt quality assessment."""
+
+    model_config = {"extra": "allow"}
+
+    score: float = 0.0
+    """Overall score, 0-100."""
+
+    grade: Literal["A", "B", "C", "D", "F"]
+    """Letter grade derived from `score`."""
+
+    dimensions: PromptQualityDimensions
+    """Per-dimension scores."""
+
+    issues: List[str] = Field(default_factory=list)
+    """Human-readable issues found with the prompt."""
+
+
+class SteerCannotComply(BaseModel):
+    """Present when `outcome` is CANNOT_COMPLY."""
+
+    model_config = {"extra": "allow"}
+
+    reason: str
+    """Why the system prompt is unprocessable."""
+
+    category: SteerCannotComplyCategory
+    """The category of concern."""
+
+
+class SteerConversationContext(BaseModel):
+    """Conversation context echoed back when `messages` were supplied."""
+
+    model_config = {"extra": "allow"}
+
+    turn_count: int = 0
+    triggering_user_message: Optional[str] = None
+
+
+class SteerPreprocessStage(BaseModel):
+    """Preprocess stage — red lines and watch items extracted from the prompt."""
+
+    model_config = {"extra": "allow"}
+
+    red_lines: int = 0
+    watch_items: int = 0
+    persona: Optional[str] = None
+    cached: bool = False
+    latency_ms: float = 0.0
+
+
+class SteerScreenStage(BaseModel):
+    """Screen stage — deterministic string/regex/evasion checks."""
+
+    model_config = {"extra": "allow"}
+
+    passed: bool = False
+    hits: int = 0
+    """Forbidden items found in the response."""
+    misses: int = 0
+    """Required items not found."""
+    evasion_patterns: List[str] = Field(default_factory=list)
+    """Detected evasion attempts."""
+    latency_ms: float = 0.0
+
+
+class SteerVerifyStage(BaseModel):
+    """Verify stage — LLM verification with early exits.
+
+    ``analysis_score`` / ``analysis_compliant`` are populated only when the
+    analysis exit point ran (i.e. triage did not resolve the outcome).
+
+    Note: docs.nope.net documents a richer planned shape (a nested
+    ``analysis`` object with per-rule fulfilment, and a ``redemption`` block).
+    That is not yet emitted by the production gateway, which returns the flat
+    fields below. ``extra='allow'`` preserves those fields at runtime if the
+    API begins returning them.
+    """
+
+    model_config = {"extra": "allow"}
+
+    exit_point: Literal["TRIAGE", "ANALYSIS", "REDEMPTION"]
+    triage_confidence: float = 0.0
+    """Triage confidence, 0-100."""
+    analysis_score: Optional[float] = None
+    """Overall compliance score in [0, 1] (present when analysis ran)."""
+    analysis_compliant: Optional[bool] = None
+    """Whether analysis judged the response compliant (present when analysis ran)."""
+    latency_ms: float = 0.0
+
+
+class SteerStages(BaseModel):
+    """The three-stage pipeline breakdown."""
+
+    model_config = {"extra": "allow"}
+
+    preprocess: SteerPreprocessStage
+    screen: SteerScreenStage
+    verify: SteerVerifyStage
+
+
+class SteerResponse(BaseModel):
+    """Response from POST /v1/steer."""
+
+    model_config = {"extra": "allow"}
+
+    outcome: SteerOutcome
+    """Verification outcome."""
+
+    compliant: bool
+    """Whether the original response was compliant."""
+
+    modified: bool
+    """Whether the response was modified (redeemed)."""
+
+    response: str
+    """Final response — original if compliant, redeemed if not, empty if CANNOT_COMPLY."""
+
+    cannot_comply: Optional[SteerCannotComply] = None
+    """Present when `outcome` is CANNOT_COMPLY."""
+
+    conversation: Optional[SteerConversationContext] = None
+    """Present when `messages` were supplied."""
+
+    prompt_quality: Optional[PromptQuality] = None
+    """System-prompt quality assessment."""
+
+    stages: SteerStages
+    """Pipeline stage details."""
+
+    audit: Optional[object] = None
+    """Detailed audit trail (present when `include_audit` was True)."""
+
+    request_id: str
+    """Request id."""
+
+    timestamp: str
+    """ISO 8601 timestamp."""
+
+    total_latency_ms: float = 0.0
+    """Total latency (ms)."""

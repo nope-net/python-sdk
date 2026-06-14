@@ -142,6 +142,33 @@ async with AsyncNopeClient(api_key="nope_live_...") as client:
 
 > **Note**: Oversight is currently in limited access. Contact us at nope.net if you'd like access.
 
+## Steer (System Prompt Compliance)
+
+Steer verifies that a proposed AI response complies with the rules in its system prompt. If the response violates a rule, Steer rewrites it (`REDEEMED`) so you can use the corrected text directly:
+
+```python
+result = client.steer(
+    system_prompt="You are a cooking assistant. Only answer cooking questions.",
+    proposed_response="The capital of France is Paris.",
+    messages=[{"role": "user", "content": "What is the capital of France?"}],
+)
+
+if result.outcome == "COMPLIANT":
+    pass  # Response already follows the rules — send it as-is.
+elif result.outcome == "REDEEMED":
+    print("Use instead:", result.response)  # Rewritten to comply.
+elif result.outcome == "CANNOT_COMPLY":
+    # The system prompt itself is unprocessable.
+    print("Rejected:", result.cannot_comply.reason, result.cannot_comply.category)
+
+# Inspect the pipeline if you want to handle violations yourself.
+print(result.stages.verify.exit_point)        # TRIAGE | ANALYSIS | REDEMPTION
+print(result.stages.verify.analysis_score)    # 0..1 compliance (when analysis ran)
+print(result.stages.screen.evasion_patterns)  # detected evasion attempts
+```
+
+Steer costs $0.001/call. In demo mode (`NopeClient(demo=True)`) it calls the unauthenticated `/v1/try/steer` endpoint, which applies stricter input limits. An `await client.steer(...)` async variant is also available.
+
 ## Signpost (Crisis Resources API)
 
 Look up crisis helplines by country, with optional AI-powered ranking:
@@ -164,6 +191,17 @@ ranked = client.signpost_smart(
 for item in ranked.ranked:
     print(f"{item.rank}. {item.resource.name}")
     print(f"   Why: {item.why}")
+
+# Vector semantic search across the whole resource database (free).
+# Unlike signpost_smart(), this is not country-scoped by default and uses
+# pre-computed embeddings rather than LLM ranking.
+hits = client.signpost_search(
+    query="lgbtq support for black community",
+    country="US",  # optional filter
+    limit=5,       # optional (max 50)
+)
+for r in hits.results:
+    print(f"{r.name} (similarity: {r.similarity}): {r.phone}")
 
 # List supported countries
 countries = client.signpost_countries()
