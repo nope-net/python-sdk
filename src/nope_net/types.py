@@ -1439,7 +1439,7 @@ class OcularResponse(BaseModel):
     [0, 1] plus the structural axes under `signals.user.*` (8 axes) and
     `signals.ai.*` (4 axes). Pick the threshold that fits your downstream
     action; published guidance uses T_WATCH=0.30 and T_DANGER=0.60 as
-    reference cutoffs (see `docs.nope.net/ocular/risk-interpretation`).
+    reference cutoffs (see `docs.nope.net/ocular`).
 
     `subject` ("self" / "other" / "unknown") identifies who the speaker-side
     risk pertains to; `imminence` is a separate axis. `fiction` and
