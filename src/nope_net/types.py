@@ -122,28 +122,28 @@ class EvaluateConfig(BaseModel):
     Kept for backwards compatibility with v1/try/evaluate."""
 
     locale: Optional[str] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     user_age_band: Optional[Literal["adult", "minor", "unknown"]] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     policy_id: Optional[str] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     include_resources: Optional[bool] = None
     """Include crisis resources in response. Default: true."""
 
     return_assistant_reply: Optional[bool] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     assistant_safety_mode: Optional[Literal["template", "generate"]] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     use_multiple_judges: Optional[bool] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     models: Optional[List[str]] = None
-    """Deprecated: v0-only. Ignored by the v1 Edge-backed endpoint."""
+    """Deprecated: v0-only. Ignored by the v1 endpoint."""
 
     conversation_id: Optional[str] = None
     """Customer-provided conversation ID for webhook correlation."""
@@ -195,7 +195,7 @@ class Risk(BaseModel):
     imminence: Imminence
     """How soon (not_applicable → emergency)."""
 
-    # Optional fields (v0 only, not present in v1 Edge-backed responses)
+    # Optional fields (v0 only, not present in v1 responses)
 
     subject_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     """
@@ -581,7 +581,7 @@ class ResponseMetadata(BaseModel):
 class EvaluateResponse(BaseModel):
     """Response from /v1/evaluate endpoint.
 
-    Note: The v1 API now uses Edge-backed classification with a simplified response.
+    Note: The v1 API returns a simplified response.
     Some fields from legacy v0 responses may not be present.
     """
 
@@ -596,10 +596,10 @@ class EvaluateResponse(BaseModel):
     risks: List[Risk]
     """Identified risks (the core of v1)."""
 
-    # === v1 Edge-backed response fields ===
+    # === v1 response fields ===
 
     rationale: Optional[str] = None
-    """Chain-of-thought reasoning from Edge model (v1 only)."""
+    """Chain-of-thought reasoning behind the classification (v1 only)."""
 
     speaker_severity: Optional[Severity] = None
     """Max severity for speaker (subject='self'). Top-level in v1, nested in summary for v0."""
@@ -759,7 +759,6 @@ class ScreenResponse(BaseModel):
     Response from legacy /v0/screen endpoint.
 
     Multi-domain safety screening across all 9 risk types.
-    Satisfies requirements for California SB243, NY Article 47.
     """
 
     model_config = {"extra": "allow"}  # Allow extra fields from API

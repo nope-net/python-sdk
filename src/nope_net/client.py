@@ -208,16 +208,16 @@ class NopeClient:
         config: Optional[Union[ScreenConfig, dict]] = None,
     ) -> ScreenResponse:
         """
-        Lightweight crisis screening for SB243/regulatory compliance.
+        Lightweight crisis screening (legacy).
 
         .. deprecated::
             Use :meth:`evaluate` instead. The screen endpoint has been consolidated
-            into evaluate, which now uses Edge-backed classification at $0.003/call.
-            This method calls the legacy ``/v0/screen`` endpoint ($0.001/call).
+            into evaluate ($0.003/call). This method calls the legacy
+            ``/v0/screen`` endpoint ($0.001/call).
 
         Fast, cheap endpoint for detecting suicidal ideation and self-harm.
         Returns independent detection flags for suicidal ideation and self-harm,
-        tuned conservatively for regulatory compliance (SB243, NY Article 47).
+        tuned conservatively (biased toward detection).
 
         Either `messages` or `text` must be provided, but not both.
 
@@ -248,9 +248,8 @@ class NopeClient:
             ```
         """
         warnings.warn(
-            "screen() is deprecated. Use evaluate() instead, which now provides "
-            "Edge-backed classification at $0.003/call. screen() calls the legacy "
-            "/v0/screen endpoint.",
+            "screen() is deprecated. Use evaluate() instead ($0.003/call). "
+            "screen() calls the legacy /v0/screen endpoint.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -258,7 +257,7 @@ class NopeClient:
         if self.demo:
             raise ValueError(
                 "screen() is not available in demo mode. Use evaluate() instead — "
-                "it uses the same Edge-backed classification and is available via /v1/try/evaluate."
+                "it is available via /v1/try/evaluate."
             )
 
         if messages is None and text is None:
@@ -1247,15 +1246,14 @@ class AsyncNopeClient:
         config: Optional[Union[ScreenConfig, dict]] = None,
     ) -> ScreenResponse:
         """
-        Lightweight crisis screening for SB243/regulatory compliance.
+        Lightweight crisis screening (legacy).
 
         .. deprecated::
             Use :meth:`evaluate` instead. See NopeClient.screen for details.
         """
         warnings.warn(
-            "screen() is deprecated. Use evaluate() instead, which now provides "
-            "Edge-backed classification at $0.003/call. screen() calls the legacy "
-            "/v0/screen endpoint.",
+            "screen() is deprecated. Use evaluate() instead ($0.003/call). "
+            "screen() calls the legacy /v0/screen endpoint.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1263,7 +1261,7 @@ class AsyncNopeClient:
         if self.demo:
             raise ValueError(
                 "screen() is not available in demo mode. Use evaluate() instead — "
-                "it uses the same Edge-backed classification and is available via /v1/try/evaluate."
+                "it is available via /v1/try/evaluate."
             )
 
         if messages is None and text is None:
