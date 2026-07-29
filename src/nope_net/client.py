@@ -38,7 +38,6 @@ from .types import (
     ScreenConfig,
     ScreenResponse,
     SignpostSearchResponse,
-    SteerResponse,
 )
 
 
@@ -361,79 +360,6 @@ class NopeClient:
 
         response = self._request("POST", "/v1/ocular", json=payload)
         return OcularResponse.model_validate(response)
-
-    def steer(
-        self,
-        *,
-        system_prompt: str,
-        proposed_response: str,
-        messages: Optional[List[Union[Message, dict]]] = None,
-        include_audit: Optional[bool] = None,
-    ) -> SteerResponse:
-        """
-        Verify that a proposed AI response complies with its system prompt.
-
-        Steer runs a PREPROCESS → SCREEN → VERIFY pipeline and returns one of
-        three outcomes:
-
-        - ``COMPLIANT``: the response already follows the rules.
-        - ``REDEEMED``: the response violated a rule and was rewritten — use
-          the returned ``response``.
-        - ``CANNOT_COMPLY``: the system prompt itself is unprocessable (see
-          ``cannot_comply``); ``response`` is empty.
-
-        Costs $0.001/call. In demo mode this calls the unauthenticated
-        ``/v1/try/steer`` endpoint (stricter input limits apply).
-
-        Args:
-            system_prompt: The rules the AI should follow.
-            proposed_response: The AI response to verify.
-            messages: Optional conversation history (must end with a user message).
-            include_audit: Include the detailed audit trail in the response.
-
-        Returns:
-            SteerResponse with ``outcome``, the final ``response``, and pipeline
-            stage details under ``stages``.
-
-        Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
-
-        Example:
-            ```python
-            result = client.steer(
-                system_prompt="You are a cooking assistant. Only answer cooking questions.",
-                proposed_response="The capital of France is Paris.",
-                messages=[{"role": "user", "content": "What is the capital of France?"}],
-            )
-            if result.outcome == "REDEEMED":
-                print("Use instead:", result.response)
-            elif result.outcome == "CANNOT_COMPLY":
-                print("Rejected:", result.cannot_comply.reason)
-            ```
-        """
-        if not system_prompt:
-            raise ValueError("'system_prompt' is required")
-        if proposed_response is None:
-            raise ValueError("'proposed_response' is required")
-
-        payload: dict = {
-            "system_prompt": system_prompt,
-            "proposed_response": proposed_response,
-        }
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-        if include_audit is not None:
-            payload["include_audit"] = include_audit
-
-        endpoint = "/v1/try/steer" if self.demo else "/v1/steer"
-        response = self._request("POST", endpoint, json=payload)
-        return SteerResponse.model_validate(response)
 
     def oversight_analyze(
         self,
@@ -1319,39 +1245,6 @@ class AsyncNopeClient:
 
         response = await self._request("POST", "/v1/ocular", json=payload)
         return OcularResponse.model_validate(response)
-
-    async def steer(
-        self,
-        *,
-        system_prompt: str,
-        proposed_response: str,
-        messages: Optional[List[Union[Message, dict]]] = None,
-        include_audit: Optional[bool] = None,
-    ) -> SteerResponse:
-        """
-        Verify that a proposed AI response complies with its system prompt (async).
-
-        See NopeClient.steer for full documentation.
-        """
-        if not system_prompt:
-            raise ValueError("'system_prompt' is required")
-        if proposed_response is None:
-            raise ValueError("'proposed_response' is required")
-
-        payload: dict = {
-            "system_prompt": system_prompt,
-            "proposed_response": proposed_response,
-        }
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-        if include_audit is not None:
-            payload["include_audit"] = include_audit
-
-        endpoint = "/v1/try/steer" if self.demo else "/v1/steer"
-        response = await self._request("POST", endpoint, json=payload)
-        return SteerResponse.model_validate(response)
 
     async def oversight_analyze(
         self,

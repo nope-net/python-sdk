@@ -84,16 +84,6 @@ from .types import (
     OcularStability,
     OcularTrajectoryEntry,
     OcularMeta,
-    # Steer types
-    SteerResponse,
-    SteerStages,
-    SteerPreprocessStage,
-    SteerScreenStage,
-    SteerVerifyStage,
-    SteerCannotComply,
-    SteerConversationContext,
-    PromptQuality,
-    PromptQualityDimensions,
     # Oversight types
     ConcernLevel,
     Trajectory,
@@ -199,16 +189,6 @@ __all__ = [
     "OcularStability",
     "OcularTrajectoryEntry",
     "OcularMeta",
-    # Steer types
-    "SteerResponse",
-    "SteerStages",
-    "SteerPreprocessStage",
-    "SteerScreenStage",
-    "SteerVerifyStage",
-    "SteerCannotComply",
-    "SteerConversationContext",
-    "PromptQuality",
-    "PromptQualityDimensions",
     # Oversight types
     "ConcernLevel",
     "Trajectory",
