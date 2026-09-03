@@ -104,9 +104,10 @@ class Message(BaseModel):
 class EvaluateConfig(BaseModel):
     """Configuration for an evaluate request.
 
-    These four keys are the whole of what ``/v1/evaluate`` reads. In demo mode
-    the client also sends ``user_country`` mirroring ``country`` because the
-    ``/v1/try/evaluate`` route reads that key (API fix A-1 pending).
+    These four keys are the whole of what ``/v1/evaluate`` and
+    ``/v1/try/evaluate`` read. In demo mode the client also sends
+    ``user_country`` mirroring ``country``; the try route accepts that key and
+    ignores it when ``country`` is present.
     """
 
     country: Optional[str] = None
@@ -220,8 +221,9 @@ class CrisisResource(BaseModel):
     """Name of the resource/organization."""
 
     id: Optional[str] = None
-    """Directory UUID. Carried by search results today; the basic and smart
-    routes gain it with API fix A-6."""
+    """Directory UUID, usable with ``signpost_by_id``. Present on every
+    database-backed resource (the basic, smart, search and evaluate routes);
+    absent on the API's hard-coded fallback registry."""
 
     name_local: Optional[str] = None
     """Native script name (e.g., いのちの電話) for non-English resources."""
@@ -830,7 +832,8 @@ class OversightConversationMetadata(BaseModel):
 
     bot_context: Optional[str] = None
     """Free-form description of the bot or persona. The ``bot_context`` argument
-    of ``oversight_analyze`` is merged here server-side."""
+    of ``oversight_analyze`` is merged here server-side and reaches the analysis
+    prompt as a calibration block."""
 
 
 class OversightConversation(BaseModel):
@@ -1301,7 +1304,7 @@ class OcularStability(BaseModel):
 
 
 class OcularTrajectoryEntry(BaseModel):
-    """One per-turn entry of ``trajectory`` (requested with ``per_turn=True``).
+    """One scored turn of ``trajectory`` (requested with ``per_turn=True``).
 
     ``salience`` is the same continuous score as the top-level field computed
     for that turn. ``signals_by_axis`` carries the per-axis intensities for the
@@ -1313,34 +1316,54 @@ class OcularTrajectoryEntry(BaseModel):
     model_config = {"extra": "allow"}
 
     role: str
-    """``user`` or the assistant role as the upstream emits it (``ai`` today on
-    the customer wire; API fix A-4 normalises it to ``assistant``)."""
+    """``user`` or ``assistant`` (the gateway normalises the upstream ``ai``)."""
 
     turn: int
+    """0-based position of this message in the request's ``messages``. With
+    the default ``trajectory_stride`` of 3 only every third turn counting back
+    from the last is scored, so consecutive entries can be three apart."""
+
     salience: float
+    """The continuous score computed for this turn alone."""
+
     signals_by_axis: Optional[Dict[str, float]] = None
+    """Per-axis intensities keyed ``suicide``, ``self_harm``, ... for the user
+    axes, ``ai_manipulation``, ``ai_harm_provision``, ... for the AI axes, plus
+    the ``genuine`` and ``fiction`` context scalars."""
 
 
 class OcularTrajectoryShape(BaseModel):
-    """Arc summary of the trajectory. Every field is present only when the
-    upstream computed it."""
+    """Arc summary of the trajectory.
+
+    Present on ``/v1/ocular`` whenever at least one turn was scored; the demo
+    route never sends it. Two indexings are in play: ``onsets`` is keyed by
+    turn index (the ``turn`` values in ``trajectory``), while ``phases``,
+    ``slopes`` and ``peak_turn`` index the ``trajectory`` list itself, so with
+    one scored turn ``peak_turn`` is 0 even when that entry's ``turn`` is 2.
+    ``phases``, ``slopes``, ``peak_turn`` and ``peak_crisis`` track the crisis
+    (suicide) axis. ``onsets`` spans every public axis. A field is absent when
+    the upstream did not compute it.
+    """
 
     model_config = {"extra": "allow"}
 
     onsets: Optional[Dict[str, int]] = None
-    """Axis -> first turn where that axis crossed its onset threshold."""
+    """Axis -> turn index (as in ``trajectory[].turn``) where that axis first
+    crossed its onset threshold."""
 
     phases: Optional[List[OcularPhase]] = None
-    """Phase label per sampled turn."""
+    """Phase label per scored turn, aligned with ``trajectory``."""
 
     slopes: Optional[List[float]] = None
-    """Salience slope per sampled turn."""
+    """Crisis-axis slope per scored turn (delta against the previous scored
+    turn), aligned with ``trajectory``."""
 
     peak_turn: Optional[int] = None
-    """Turn with the highest salience."""
+    """Index into ``trajectory`` of the entry with the highest crisis-axis
+    signal (a list position, not a ``turn`` value)."""
 
     peak_crisis: Optional[float] = None
-    """Highest salience observed."""
+    """Highest crisis-axis signal across the scored turns."""
 
 
 class OcularMeta(BaseModel):
@@ -1376,7 +1399,8 @@ class OcularResponse(BaseModel):
     and per-axis levels server-side; surface them for inspection.
 
     ``trajectory`` and ``trajectory_shape`` are present only when the request
-    set ``per_turn=True``.
+    set ``per_turn=True``; the shape follows whenever at least one turn was
+    scored (see :class:`OcularTrajectoryShape` for its two indexings).
     """
 
     model_config = {"extra": "allow"}
@@ -1412,10 +1436,13 @@ class OcularResponse(BaseModel):
     """Response metadata: model version, inference time, windowing flags."""
 
     trajectory: Optional[List[OcularTrajectoryEntry]] = None
-    """Per-turn salience trail. Only with ``per_turn=True``."""
+    """Scored turns in turn order. Only with ``per_turn=True``; with the default
+    ``trajectory_stride`` of 3 only every third turn counting back from the
+    last is included."""
 
     trajectory_shape: Optional[OcularTrajectoryShape] = None
-    """Arc summary of the trajectory. Only with ``per_turn=True``."""
+    """Arc summary of the trajectory. Only with ``per_turn=True`` on
+    ``/v1/ocular``; the demo route never sends it."""
 
 
 class OcularHead(BaseModel):
@@ -1441,7 +1468,9 @@ class OcularDemoResponse(OcularResponse):
 
     Same surface as :class:`OcularResponse` plus ``heads`` and ``detail``,
     both keyed by public family head names (``USER_SUICIDE_HEAD_A`` ...). The
-    demo route caps input at 12 messages of 4,000 characters.
+    demo route caps input at 12 messages of 4,000 characters, returns
+    ``trajectory`` with ``per_turn=True`` but never ``trajectory_shape``, and
+    ignores ``thoroughness`` and the identity fields.
     """
 
     heads: List[OcularHead]
@@ -1489,8 +1518,7 @@ class SignpostSearchResult(BaseModel):
     Search returns the raw directory row (plural ``service_scopes``,
     ``populations``, ``resource_type``, ``contacts``, explicit nulls) with the
     tier-1 contacts flattened to top-level keys and ``type`` mirroring
-    ``resource_type``. It is a different shape from :class:`CrisisResource`
-    until API fix A-7 routes search hits through the same converter.
+    ``resource_type``. It is a different shape from :class:`CrisisResource`.
     """
 
     model_config = {"extra": "allow"}

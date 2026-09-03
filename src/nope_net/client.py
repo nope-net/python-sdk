@@ -202,12 +202,15 @@ class NopeClient:
             messages: Conversation messages, each ``{"role": "user" | "assistant",
                 "content": str}`` or a ``Message``. Any sequence (list, tuple) of
                 dicts, mappings or models is accepted and sent as a JSON array.
-            text: Plain text input (free-form transcripts or session notes).
+            text: Plain text input (free-form transcripts or session notes). A note
+                about someone else yields ``speaker_severity`` ``none`` with a
+                ``subject`` ``other`` risk; check ``risks[].subject`` or
+                :func:`has_third_party_risk` for third-party risk.
             config: ``country`` (ISO 3166-1 alpha-2, default US), ``include_resources``
                 (default true), ``conversation_id`` and ``end_user_id`` (webhook
-                correlation). In demo mode the client mirrors ``country`` into
-                ``user_country`` because the try route reads that key, and the demo
-                route always includes resources.
+                correlation). The demo route reads ``country`` too (the client also
+                sends it as ``user_country``, which the route ignores) and always
+                includes resources.
 
         Returns:
             EvaluateResponse with ``risks``, ``speaker_severity``, ``speaker_imminence``,
@@ -259,8 +262,9 @@ class NopeClient:
         Lightweight crisis screening (legacy ``/v0/screen``, $0.001 per call).
 
         .. deprecated::
-            Use :meth:`evaluate` instead. Kept while the v0 route is served;
-            no sunset date has been set. Not available in demo mode.
+            Use :meth:`evaluate` instead. The ``/v0/screen`` route is served with
+            Deprecation and Sunset headers and sunsets on 2027-01-01, the date the
+            runtime warning names. Not available in demo mode.
 
         Returns independent ``suicidal_ideation`` and ``self_harm`` flags plus a
         ``risks`` array, tuned conservatively (biased toward detection).
@@ -331,10 +335,14 @@ class NopeClient:
             text: Plain text input (alternative to messages).
             thoroughness: 'fast' (1 variant, lowest latency), 'auto' (server default),
                 'thorough' (multiple variants, populates ``stability``).
-            per_turn: Score every turn and return ``trajectory`` (per-turn salience and
-                ``signals_by_axis``) plus ``trajectory_shape``. Off by default; the
-                price is unchanged.
-            trajectory_stride: Extract every Nth turn backwards from the last (1..64).
+            per_turn: Return ``trajectory`` (one entry per scored turn: the 0-based
+                ``turn`` index into ``messages``, ``salience`` and ``signals_by_axis``
+                with ``ai_``-prefixed AI axes plus ``genuine``/``fiction``) and, on
+                ``/v1/ocular``, ``trajectory_shape``. Off by default; the price is
+                unchanged.
+            trajectory_stride: Score every Nth turn counting back from the last
+                (1..64). The server default is 3, so a three-message conversation
+                yields one scored turn (``turn`` 2); pass 1 to score every turn.
             user_id: Opaque identifier stored in your usage metadata for dashboard
                 analytics (1..256 chars). Never forwarded to the model host.
             session_id: As ``user_id``.
@@ -343,7 +351,8 @@ class NopeClient:
         Returns:
             OcularResponse; in demo mode an ``OcularDemoResponse`` that adds
             ``heads`` and ``detail`` keyed by public family head names. The demo
-            route ignores ``thoroughness`` and the identity fields.
+            route ignores ``thoroughness`` and the identity fields, and returns
+            ``trajectory`` but never ``trajectory_shape``.
 
         Raises:
             NopeValidationError: Neither or both inputs, a bad role,
@@ -405,8 +414,9 @@ class NopeClient:
                 or ``system``; optional ``message_id``, ``timestamp``, ``agent_id``,
                 ``agent_version``, ``context``) and optional ``metadata``.
             bot_context: Free-form description of the bot or persona ("customer
-                support bot for an airline"). Accepted by the API; server-side
-                propagation into the analysis prompt is being fixed (API fix A-2).
+                support bot for an airline"). The API merges it into the conversation
+                metadata and builds a calibration block from it in the analysis
+                prompt.
             config: ``strategy`` (``single``/``sliding``, auto by length), ``mode``
                 (``full``/``fast``), ``include_raw_xml``, ``model``. Fast mode
                 returns no ``summary``/``pattern_assessment``, an empty
@@ -663,8 +673,8 @@ class NopeClient:
         """
         One crisis resource by directory UUID (public, no key needed).
 
-        Search results carry ``id``; basic and smart results gain it with API
-        fix A-6.
+        Every database-backed resource carries ``id`` (basic, smart, search and
+        evaluate results); the API's hard-coded fallback registry does not.
 
         Raises:
             NopeValidationError: Malformed UUID.

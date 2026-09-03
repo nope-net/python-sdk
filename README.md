@@ -79,8 +79,7 @@ print(result.metadata.try_endpoint, result.metadata.model)
 
 Demo caveats: the try route always includes resources, ignores
 `include_resources`, truncates input to the last 10 messages, and reads the
-country from `config.user_country`. The client mirrors `country` into that key
-for you until API fix A-1 is deployed.
+country from `config.country` like the paid route.
 
 ## Async
 
@@ -132,6 +131,11 @@ result = client.evaluate(
 print(result.metadata.input_format)  # "text_blob"
 ```
 
+A note about someone else (a clinician's note about a patient, say) yields
+`speaker_severity` `"none"` with a risk whose `subject` is `"other"`, because
+`speaker_severity` covers the speaker only. Check `risks[].subject` or
+`has_third_party_risk(result.risks)` when third-party risk matters.
+
 ### Compatibility note on `resources`
 
 3.x exposed `resources` as a dict. The typed model keeps
@@ -141,8 +145,8 @@ code should use attribute access.
 ## Screen (deprecated)
 
 `screen()` calls the legacy `/v0/screen` route ($0.001 per call). It still
-works and emits a `DeprecationWarning`; use `evaluate()` for new code. It has
-no demo route.
+works and emits a `DeprecationWarning` naming the route's sunset date,
+2027-01-01. Use `evaluate()` for new code. It has no demo route.
 
 ```python
 result = client.screen(text="I've been having dark thoughts lately", config={"country": "US"})
@@ -201,8 +205,8 @@ Options:
 - `bot_context`: a description of the persona so the analyser can calibrate
   its expectations to that product (an "I love you" from a romantic companion
   persona reads differently from the same line in a customer-support bot).
-  Accepted by the API today; server-side propagation into the prompt is being
-  fixed.
+  The API merges it into the conversation metadata and builds a calibration
+  block from it in the analysis prompt.
 
 In demo mode the call returns `OversightDemoAnalyzeResponse` with `mode`
 (`single` or `fast`), `result` and `try_endpoint`. The demo route ignores
@@ -263,15 +267,30 @@ if result.trajectory_shape:
 ```
 
 Reference cutoffs from the dashboard band view are 0.30 (watch) and 0.60
-(danger). `trajectory` and `trajectory_shape` are present only when
-`per_turn=True`. `thoroughness` (`fast`, `auto`, `thorough`) sets the ensemble
-depth; `thorough` populates `stability`. `user_id`, `session_id` and
-`agent_id` are stored in your usage metadata for dashboard analytics and are
-never forwarded to the model host.
+(danger). `thoroughness` (`fast`, `auto`, `thorough`) sets the ensemble depth;
+`thorough` populates `stability`. `user_id`, `session_id` and `agent_id` are
+stored in your usage metadata for dashboard analytics and are never forwarded
+to the model host.
+
+`per_turn=True` adds `trajectory` and `trajectory_shape`. Each `trajectory`
+entry's `turn` is the 0-based position of that message in `messages`.
+`trajectory_stride` defaults to 3, so only every third turn counting back
+from the last is scored (the last message, then the one three before it, and
+so on); a three-message conversation therefore yields one entry, at `turn`
+2. Pass `trajectory_stride=1` to score every turn. `signals_by_axis` keys the
+user axes bare (`suicide`), the AI axes with an `ai_` prefix
+(`ai_manipulation`) and adds the `genuine` and `fiction` context scalars. In
+`trajectory_shape`, `onsets` maps an axis to the turn index where it first
+crossed its onset threshold, while `phases`, `slopes` and `peak_turn` index
+the `trajectory` list itself, so with one scored turn `peak_turn` is 0 even
+when that entry's `turn` is 2. `phases`, `slopes`, `peak_turn` and
+`peak_crisis` track the crisis (suicide) axis. `onsets` spans every axis. On
+`/v1/ocular` the shape is present whenever at least one turn was scored.
 
 In demo mode `ocular` routes to `/v1/try/ocular` and returns
 `OcularDemoResponse`, which adds `heads` and `detail` keyed by public family
-head names:
+head names. The demo route returns `trajectory` with `per_turn=True` but
+never `trajectory_shape`:
 
 ```python
 demo_result = NopeClient(demo=True).ocular(
@@ -317,6 +336,10 @@ print(countries.count, "US" in countries.countries)
 detected = client.detect_country()
 print(detected.detected, detected.country_code or "(none)")
 ```
+
+With `scopes`, `SignpostResponse` carries `primary` (resources matching the
+scopes) and `secondary` (general resources for the country) beside
+`resources`, plus `scopes_requested`. Without scopes only `resources` is set.
 
 `detect_country()` reads only headers a proxy injects (Cloudflare
 `cf-ipcountry`, Netlify and Vercel `x-country` / `x-vercel-ip-country`). A
@@ -490,9 +513,21 @@ else:
     print(meta.rate_limit.remaining, meta.balance.cost_mills)
 ```
 
-Every error carries `status_code`, `code` (the API's machine string, for
-example `insufficient_balance`, or `None`), `message` (the sentence) and
-`response_body`. `retry_after` values are seconds.
+Every error carries `status_code`, `code`, `message` (the sentence),
+`response_body` (the raw response text) and `body` (that text parsed into a
+dict when the response was a JSON object, else `None`). `details` is `{}` on
+every class except `NopeValidationError`, which fills it with the body's
+extra keys. `code` is the API's machine string (`insufficient_balance`,
+`rate_limit_exceeded`) and is present only when the body carries one: always
+on 402 and 429, on some 403 and 503 bodies, never on 400, 401, 404 or 413,
+which carry a sentence. Branch on the exception class or on `status_code`.
+`retry_after` values are seconds.
+
+Client-side validation (an empty `messages`, a `system` role, more than 100
+messages, `text` and `messages` together) and demo-mode refusals raise
+`NopeValidationError` before any request is sent, with `status_code` `None`
+and `code` `invalid_request` or `not_available_in_demo`. The class is also a
+`ValueError`, so an existing `except ValueError` still catches them.
 
 The client retries a 429 or 503 up to `max_retries` times (default 2),
 waiting for `Retry-After` (capped at 30 seconds). It never retries timeouts,

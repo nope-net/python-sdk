@@ -101,8 +101,9 @@ def build_evaluate_request(
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for ``evaluate``.
 
-    In demo mode ``config.user_country`` mirrors ``config.country`` because the
-    ``/v1/try/evaluate`` route reads that key until API fix A-1 is deployed.
+    The ``/v1/try/evaluate`` route reads ``config.country``. In demo mode the
+    client also sends ``config.user_country`` with the same value; the route
+    accepts that key and ignores it when ``country`` is present.
     """
     payload = _messages_or_text(
         messages, text, allowed_roles=("user", "assistant"), max_messages=MAX_EVALUATE_MESSAGES

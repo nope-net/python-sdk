@@ -52,16 +52,6 @@ def _screen_body() -> Dict[str, Any]:
     }
 
 
-def _ocular_with_trajectory() -> Dict[str, Any]:
-    body = load_fixture("ocular/auth.json")
-    body["trajectory"] = [
-        {"turn": 1, "role": "user", "salience": 0.12, "signals_by_axis": {"suicide": 0.1}},
-        {"turn": 3, "role": "user", "salience": 0.37, "signals_by_axis": {"suicide": 0.36}},
-    ]
-    body["trajectory_shape"] = {"phases": ["baseline", "emerging"], "peak_turn": 3}
-    return body
-
-
 def build_fake_api() -> FakeApi:
     api = FakeApi()
     gb = load_fixture("signpost/auth.gb.json")
@@ -115,7 +105,7 @@ def build_fake_api() -> FakeApi:
             ],
         },
     )
-    api.add("POST", "/v1/ocular", json_body=_ocular_with_trajectory())
+    api.add("POST", "/v1/ocular", json_body=load_fixture("ocular/auth.per-turn.json"))
     api.add("POST", "/v1/try/ocular", json_body=load_fixture("ocular/try.json"))
     api.add("GET", "/v1/signpost", json_body=dict(gb, primary=gb["resources"], secondary=[]))
     api.add("GET", "/v1/signpost/smart", json_body=load_fixture("signpost/try.smart.json"))
@@ -222,6 +212,26 @@ def test_readme_prose_rules() -> None:
         assert (README.parent / link).is_file(), f"{link} linked but missing"
     for stale in ("risk.critical", "risk.elevated", "user_country=", '"user_country"'):
         assert stale not in text, stale
+    assert "API fix A-" not in text, "internal ticket reference"
+
+
+def test_readme_states_the_contracts_the_blind_report_missed() -> None:
+    """Sentences added in 4.0.1; each names a behaviour a newcomer had to guess."""
+    text = README.read_text(encoding="utf-8")
+    for phrase in (
+        "`code` `invalid_request` or `not_available_in_demo`",
+        "`body` (that text parsed into a",
+        "never on 400, 401, 404 or 413",
+        "0-based position of that message in `messages`",
+        "`trajectory_stride` defaults to 3",
+        "`ai_` prefix",
+        "never `trajectory_shape`",
+        "`has_third_party_risk(result.risks)`",
+        "`primary` (resources matching the",
+        "`delivery_id` (the `X-NOPE-Delivery-ID` header",
+        "2027-01-01",
+    ):
+        assert phrase in text, phrase
 
 
 def test_readme_event_names_present() -> None:
