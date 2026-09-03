@@ -7,7 +7,7 @@ All notable changes to the `nope-net` package. The format follows
 ## 4.0.0 - 2026-09-03
 
 Realigns the SDK with the API at commit 73c477c. Every response model is now
-pinned to a sanitized live capture under `tests/fixtures/`, and the three
+pinned to a sanitized live capture under `tests/fixtures/`, and the two
 versions that never reached PyPI (2.3.1, 3.0.0) are folded into this release.
 The last published version is 2.3.0.
 
