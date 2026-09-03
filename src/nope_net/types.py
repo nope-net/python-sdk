@@ -1,11 +1,11 @@
 """
-NOPE SDK Types (v1 API)
+NOPE SDK types (v1 API)
 
-Pydantic models for API requests and responses.
+Pydantic models for requests and responses. Response models tolerate unknown
+keys (``extra="allow"``) so an additive API change never breaks parsing; the
+contract tests under ``tests/contract/`` pin every shape to a live capture.
 
-Uses orthogonal subject/type separation:
-- WHO is at risk (subject: self | other | unknown)
-- WHAT type of harm (type: suicide | violence | abuse | ...)
+Risks separate WHO is at risk (``subject``) from WHAT kind of harm (``type``).
 """
 
 from typing import Any, Dict, List, Literal, Optional
@@ -13,14 +13,15 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 # =============================================================================
-# Core Enums / Literals
+# Core enums / literals
 # =============================================================================
 
-# Who is at risk
-# - self: The speaker is at risk
-# - other: Someone else is at risk (friend, family, stranger)
-# - unknown: Ambiguous - classic "asking for a friend" territory (v0 only; v1 maps unknown → self)
-RiskSubject = Literal["self", "other", "unknown"]
+# Who is at risk on /v1/evaluate. The classifier's 'unknown' ("asking for a
+# friend") is mapped to 'self' server-side, so the v1 wire carries two values.
+RiskSubject = Literal["self", "other"]
+
+# The legacy /v0/screen route still emits the three-value form.
+ScreenRiskSubject = Literal["self", "other", "unknown"]
 
 # What type of harm (9 harm-based types)
 # - suicide: Self-directed lethal intent (C-SSRS levels derivable from features)
@@ -44,29 +45,14 @@ RiskType = Literal[
     "stalking",
 ]
 
-# Communication style - how the user is expressing themselves
-# Orthogonal to risk assessment - informs response style, not risk level.
-CommunicationStyle = Literal[
-    "direct",  # Explicit first-person ("I want to die")
-    "humor",  # Dark humor, memes, "lol kms"
-    "fiction",  # Creative writing, poetry, roleplay
-    "hypothetical",  # "What if someone...", philosophical
-    "distanced",  # "Asking for a friend", third-party framing
-    "clinical",  # Professional/medical language
-    "minimized",  # Hedged, softened ("not that I would, but...")
-    "adversarial",  # Jailbreak attempts, encoded content
-]
-
 # Severity scale (how bad)
 Severity = Literal["none", "mild", "moderate", "high", "critical"]
 
 # Imminence scale (how soon)
 Imminence = Literal["not_applicable", "chronic", "subacute", "urgent", "emergency"]
 
-# Evidence grade for legal/clinical flags
-EvidenceGrade = Literal["strong", "moderate", "weak", "consensus", "none"]
-
-# Crisis resource type
+# Crisis resource contact modality. Branch on this field to tell an actual
+# line (crisis_line, text_line, chat_service) from a service or portal.
 CrisisResourceType = Literal[
     "emergency_number",
     "crisis_line",
@@ -77,8 +63,9 @@ CrisisResourceType = Literal[
     "online_resource",
 ]
 
-# Crisis resource kind
-CrisisResourceKind = Literal["helpline", "reporting_portal", "directory", "self_help_site"]
+# What the resource IS. The directory derives this from `type`; support
+# services are bucketed under `helpline`.
+CrisisResourceKind = Literal["helpline", "reporting_portal", "self_help_site"]
 
 # Crisis resource priority tier
 CrisisResourcePriorityTier = Literal[
@@ -98,7 +85,7 @@ ResourceProminence = Literal["high", "medium", "low"]
 
 
 # =============================================================================
-# Request Types
+# Request types
 # =============================================================================
 
 
@@ -107,317 +94,77 @@ class Message(BaseModel):
 
     role: Literal["user", "assistant"]
     content: str
-    timestamp: Optional[str] = None  # ISO 8601
+    timestamp: Optional[str] = None
+    """ISO 8601. Accepted by the API and ignored."""
 
 
 class EvaluateConfig(BaseModel):
-    """Configuration for evaluation request."""
+    """Configuration for an evaluate request.
+
+    These four keys are the whole of what ``/v1/evaluate`` reads. In demo mode
+    the client also sends ``user_country`` mirroring ``country`` because the
+    ``/v1/try/evaluate`` route reads that key (API fix A-1 pending).
+    """
 
     country: Optional[str] = None
-    """Country for crisis resources (ISO country code, e.g., 'US', 'GB')."""
-
-    user_country: Optional[str] = None
-    """Deprecated: use ``country`` instead. Silently ignored by the v1 API.
-    Kept for backwards compatibility with v1/try/evaluate."""
-
-    locale: Optional[str] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
-
-    user_age_band: Optional[Literal["adult", "minor", "unknown"]] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
-
-    policy_id: Optional[str] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
+    """ISO 3166-1 alpha-2 country for crisis resources (default US)."""
 
     include_resources: Optional[bool] = None
-    """Include crisis resources in response. Default: true."""
-
-    return_assistant_reply: Optional[bool] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
-
-    assistant_safety_mode: Optional[Literal["template", "generate"]] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
-
-    use_multiple_judges: Optional[bool] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
-
-    models: Optional[List[str]] = None
-    """Deprecated: v0-only. Ignored by the v1 endpoint."""
+    """Include crisis resources in the response (default true). The demo route
+    always includes them."""
 
     conversation_id: Optional[str] = None
-    """Customer-provided conversation ID for webhook correlation."""
+    """Your conversation ID, echoed into webhook payloads for correlation."""
 
     end_user_id: Optional[str] = None
-    """Customer-provided end-user ID for webhook correlation."""
+    """Your end-user ID, echoed into webhook payloads for correlation."""
 
 
 class EvaluateRequest(BaseModel):
-    """Request to /v1/evaluate endpoint."""
+    """Request body for ``POST /v1/evaluate``."""
 
     messages: Optional[List[Message]] = None
-    """Conversation messages. Either messages OR text must be provided."""
+    """Conversation messages. Exactly one of ``messages`` or ``text``."""
 
     text: Optional[str] = None
-    """Plain text input. Either messages OR text must be provided."""
+    """Plain text input. Exactly one of ``messages`` or ``text``."""
 
     config: EvaluateConfig = Field(default_factory=EvaluateConfig)
     """Configuration options."""
 
-    user_context: Optional[str] = None
-    """Free-text user context to help shape responses."""
-
 
 # =============================================================================
-# Risk Structure
+# Risk structure
 # =============================================================================
 
 
 class Risk(BaseModel):
+    """One identified risk: a subject plus a type, with its assessment.
+
+    A conversation can carry several risks (an IPV victim with suicidal
+    ideation is two entries).
     """
-    A single identified risk.
 
-    Each risk represents one subject + type combination with its assessment.
-    A conversation can have multiple risks (e.g., IPV victim with suicidal ideation).
-    """
-
-    model_config = {"extra": "allow"}  # Allow extra fields from API
-
-    subject: RiskSubject
-    """Who is at risk."""
+    model_config = {"extra": "allow"}
 
     type: RiskType
     """What type of harm."""
 
+    subject: RiskSubject
+    """Who is at risk: ``self`` (the speaker) or ``other``."""
+
     severity: Severity
-    """How severe (none → critical)."""
+    """How severe (none to critical)."""
 
     imminence: Imminence
-    """How soon (not_applicable → emergency)."""
-
-    # Optional fields (v0 only, not present in v1 responses)
-
-    subject_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    """
-    Confidence in subject determination (0.0-1.0). v0 only.
-
-    Low values indicate ambiguity:
-    - 0.9+ = Clear ("I want to kill myself" → self)
-    - 0.5-0.7 = Moderate ("Asking for a friend" → likely self, but uncertain)
-    - <0.5 = Very uncertain
-    """
-
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    """Confidence in this risk assessment (0.0-1.0). v0 only."""
+    """How soon (not_applicable to emergency)."""
 
     features: Optional[List[str]] = None
-    """Evidence features supporting this risk."""
+    """Evidence features supporting this risk. The key is absent when empty."""
 
 
 # =============================================================================
-# Communication Structure
-# =============================================================================
-
-
-class CommunicationStyleAssessment(BaseModel):
-    """Communication style with confidence."""
-
-    style: CommunicationStyle
-    confidence: float = Field(ge=0.0, le=1.0)
-
-
-class CommunicationAssessment(BaseModel):
-    """Communication analysis."""
-
-    styles: List[CommunicationStyleAssessment]
-    """Detected communication styles (may have multiple)."""
-
-    language: str
-    """Detected language (ISO 639-1)."""
-
-    locale: Optional[str] = None
-    """Detected locale (e.g., 'en-US')."""
-
-
-# =============================================================================
-# Summary Structure
-# =============================================================================
-
-
-class Summary(BaseModel):
-    """
-    Quick summary derived from risks array.
-
-    speaker_severity/imminence are calculated from risks where subject='self'
-    and subject_confidence > 0.5. This ensures bystanders don't get
-    crisis-level responses for third-party concerns.
-    """
-
-    speaker_severity: Severity
-    """Max severity from risks where subject='self' and confidence > 0.5."""
-
-    speaker_imminence: Imminence
-    """Max imminence from risks where subject='self' and confidence > 0.5."""
-
-    any_third_party_risk: bool
-    """Whether any risk has subject='other'."""
-
-    primary_concerns: str
-    """Narrative summary of key findings."""
-
-
-# =============================================================================
-# Legal Flags
-# =============================================================================
-
-
-class IPVFlags(BaseModel):
-    """
-    IPV-specific flags.
-
-    Based on DASH (UK) and Danger Assessment (Johns Hopkins).
-    Strangulation is the single strongest predictor of homicide in IPV.
-    """
-
-    indicated: bool
-    """IPV indicators present."""
-
-    strangulation: bool
-    """ANY history of strangulation/choking (750x homicide risk)."""
-
-    lethality_risk: Literal["standard", "elevated", "severe", "extreme"]
-    """Overall lethality risk."""
-
-    escalation_pattern: Optional[bool] = None
-    """Escalation pattern detected."""
-
-    confidence: Optional[float] = None
-    """Confidence in assessment."""
-
-
-class SafeguardingConcernFlags(BaseModel):
-    """
-    Safeguarding concern flags.
-
-    Indicates patterns that may trigger statutory obligations depending on
-    jurisdiction and the platform's role. NOPE flags concerns; humans determine
-    whether mandatory reporting applies based on local law and organizational policy.
-
-    Note: AI systems are not mandatory reporters under any current statute.
-    This flag surfaces patterns for human review, not legal determinations.
-    """
-
-    indicated: bool
-    """Safeguarding concern indicators present."""
-
-    context: Literal["minor_involved", "vulnerable_adult", "csa", "infant_at_risk", "elder_abuse"]
-    """Context triggering the concern."""
-
-
-class ThirdPartyThreatFlags(BaseModel):
-    """Third-party threat flags (Tarasoff-style duty to warn)."""
-
-    tarasoff_duty: bool
-    """Tarasoff duty potentially triggered."""
-
-    specific_target: bool
-    """Specific identifiable target."""
-
-    confidence: Optional[float] = None
-    """Confidence in assessment."""
-
-
-class StalkingFlags(BaseModel):
-    """
-    Stalking flags.
-
-    Based on SAM (Stalking Assessment & Management) framework.
-    Ex-intimate partner stalking has significantly elevated homicide risk.
-    """
-
-    ex_intimate_partner: bool
-    """Former intimate partner (highest risk per SAM)."""
-
-    escalation_detected: bool
-    """Escalation in frequency/severity detected."""
-
-    violence_history: bool
-    """History of violence toward victim."""
-
-    victim_fear_expressed: bool
-    """Victim expresses fear for safety (predictive per SAM)."""
-
-    risk_level: Literal["standard", "elevated", "severe"]
-    """
-    Risk level derived from SAM domains:
-    - severe: violence_history + escalation, OR prior violence + victim fears for life
-    - elevated: ex_intimate_partner, OR escalation + victim_fear
-    - standard: Basic stalking pattern without amplifiers
-    """
-
-
-class LegalFlags(BaseModel):
-    """
-    Legal/safety flags.
-
-    Derived from risks + features but surfaced separately for easy consumption.
-    """
-
-    ipv: Optional[IPVFlags] = None
-    """Intimate partner violence indicators."""
-
-    safeguarding_concern: Optional[SafeguardingConcernFlags] = None
-    """Safeguarding concern indicators (patterns that may trigger statutory review)."""
-
-    third_party_threat: Optional[ThirdPartyThreatFlags] = None
-    """Third-party threat indicators."""
-
-    stalking: Optional[StalkingFlags] = None
-    """Stalking indicators (SAM-based)."""
-
-
-# =============================================================================
-# Protective Factors
-# =============================================================================
-
-
-class ProtectiveFactorsInfo(BaseModel):
-    """Protective factors."""
-
-    protective_factors: Optional[List[str]] = None
-    """Specific protective factors present."""
-
-    protective_factor_strength: Optional[Literal["weak", "moderate", "strong"]] = None
-    """Overall strength assessment."""
-
-
-# =============================================================================
-# Filter Result
-# =============================================================================
-
-
-class PreliminaryRisk(BaseModel):
-    """Preliminary risk from filter stage."""
-
-    subject: RiskSubject
-    type: RiskType
-    confidence: float = Field(ge=0.0, le=1.0)
-
-
-class FilterResult(BaseModel):
-    """Filter stage results."""
-
-    triage_level: Literal["none", "concern"]
-    """Triage level."""
-
-    preliminary_risks: List[PreliminaryRisk]
-    """Preliminary risks detected (lightweight)."""
-
-    reason: str
-    """Reason for triage decision."""
-
-
-# =============================================================================
-# Crisis Resources
+# Crisis resources
 # =============================================================================
 
 
@@ -448,14 +195,18 @@ class OpenStatus(BaseModel):
     """ISO timestamp of next open/close transition."""
 
     confidence: Literal["high", "low", "none"]
-    """How confident we are in this status."""
+    """How confident the directory is in this status."""
 
     message: Optional[str] = None
     """Human-readable status message (e.g., 'Open 24/7', 'Closed · Opens in 2 hours')."""
 
 
 class CrisisResource(BaseModel):
-    """A crisis resource (helpline, text line, etc.)."""
+    """A crisis resource: a helpline, text line, chat service, portal or site.
+
+    Only ``type`` and ``name`` are always present. ``type`` is the field to
+    branch on when you need an actual line rather than a service.
+    """
 
     model_config = {"extra": "allow"}
 
@@ -465,6 +216,10 @@ class CrisisResource(BaseModel):
     name: str
     """Name of the resource/organization."""
 
+    id: Optional[str] = None
+    """Directory UUID. Carried by search results today; the basic and smart
+    routes gain it with API fix A-6."""
+
     name_local: Optional[str] = None
     """Native script name (e.g., いのちの電話) for non-English resources."""
 
@@ -472,7 +227,7 @@ class CrisisResource(BaseModel):
     """Phone number."""
 
     text_instructions: Optional[str] = None
-    """Text instructions (e.g., 'Text HOME to 741741') - human readable fallback."""
+    """Text instructions (e.g., 'Text HOME to 741741'), human-readable fallback."""
 
     sms_number: Optional[str] = None
     """SMS number for sms: links (e.g., '741741')."""
@@ -529,10 +284,10 @@ class CrisisResource(BaseModel):
     """Description of the service."""
 
     resource_kind: Optional[CrisisResourceKind] = None
-    """What the resource IS (helpline vs reporting portal vs directory)."""
+    """What the resource IS (helpline, reporting portal, self-help site)."""
 
     service_scope: Optional[List[str]] = None
-    """Issues this resource handles (aligned with classification taxonomy)."""
+    """Issues this resource handles (aligned with the classification taxonomy)."""
 
     population_served: Optional[List[str]] = None
     """Populations this resource serves."""
@@ -546,45 +301,95 @@ class CrisisResource(BaseModel):
     prominence: Optional[ResourceProminence] = None
     """How well-known/established the resource is."""
 
-    source: Optional[Literal["database", "web_search"]] = None
-    """Source of this resource."""
+    country_codes: Optional[List[str]] = None
+    """ISO 3166-1 alpha-2 countries this resource serves. Absent means global."""
+
+    subdivision_codes: Optional[List[str]] = None
+    """ISO 3166-2 subdivisions (e.g., 'US-CA', 'GB-NIR'). Absent means country-wide."""
+
+
+class _ItemAccess:
+    """Compatibility shim: 3.x exposed ``resources`` as a dict.
+
+    ``result.resources["primary"]["phone"]`` keeps working on the typed models.
+    Attribute access (``result.resources.primary.phone``) is the 4.0 surface.
+    """
+
+    def __getitem__(self, key: str) -> Any:
+        model_fields = type(self).model_fields  # type: ignore[attr-defined]
+        extra = getattr(self, "model_extra", None) or {}
+        if key in model_fields or key in extra:
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+
+class EvaluateResource(CrisisResource, _ItemAccess):
+    """A crisis resource matched to this evaluation, with a short relevance note."""
+
+    why: str
+    """Short note on why this resource was picked for the detected risks."""
+
+
+class EvaluateResources(BaseModel, _ItemAccess):
+    """Resources block on an evaluate response: one primary plus up to three secondary."""
+
+    model_config = {"extra": "allow"}
+
+    primary: EvaluateResource
+    """Primary recommended resource."""
+
+    secondary: List[EvaluateResource]
+    """Additional relevant resources (0 to 3)."""
 
 
 # =============================================================================
-# Response Types
+# Evaluate response
 # =============================================================================
 
 
-class RecommendedReply(BaseModel):
-    """Recommended reply content."""
-
-    content: str
-    source: Literal["template", "llm_generated"]
-    notes: Optional[str] = None
-
-
-class ResponseMetadata(BaseModel):
+class EvaluateMetadata(BaseModel):
     """Metadata about the request/response."""
 
     model_config = {"extra": "allow"}
 
-    access_level: Optional[Literal["unauthenticated", "authenticated", "admin"]] = None
-    is_admin: Optional[bool] = None
+    api_version: Literal["v1"]
+    input_format: Literal["structured", "text_blob"]
     messages_truncated: Optional[bool] = None
-    input_format: Optional[Literal["structured", "text_blob"]] = None
-    api_version: Literal["v1"] = "v1"
     try_endpoint: Optional[bool] = None
-    """True if request came via /v1/try/* endpoints."""
+    """True when served by ``/v1/try/evaluate``."""
+    model: Optional[str] = None
+    """Model identifier; sent by the demo route."""
 
 
 class EvaluateResponse(BaseModel):
-    """Response from /v1/evaluate endpoint.
+    """Response from ``POST /v1/evaluate`` (and ``/v1/try/evaluate`` in demo mode)."""
 
-    Note: The v1 API returns a simplified response.
-    Some fields from legacy v0 responses may not be present.
-    """
+    model_config = {"extra": "allow"}
 
-    model_config = {"extra": "allow"}  # Allow extra fields from API
+    risks: List[Risk]
+    """Identified risks."""
+
+    rationale: str
+    """Chain-of-thought reasoning behind the classification."""
+
+    speaker_severity: Severity
+    """Max severity across risks where subject is ``self``."""
+
+    speaker_imminence: Imminence
+    """Max imminence across risks where subject is ``self``."""
+
+    show_resources: bool
+    """Whether crisis resources should be shown."""
+
+    resources: Optional[EvaluateResources] = None
+    """Crisis resources; present when ``show_resources`` is true and
+    ``include_resources`` was not false."""
 
     request_id: str
     """Unique request ID for audit trail correlation."""
@@ -592,86 +397,25 @@ class EvaluateResponse(BaseModel):
     timestamp: str
     """ISO 8601 timestamp for audit trail."""
 
-    risks: List[Risk]
-    """Identified risks (the core of v1)."""
-
-    # === v1 response fields ===
-
-    rationale: Optional[str] = None
-    """Chain-of-thought reasoning behind the classification (v1 only)."""
-
-    speaker_severity: Optional[Severity] = None
-    """Max severity for speaker (subject='self'). Top-level in v1, nested in summary for v0."""
-
-    speaker_imminence: Optional[Imminence] = None
-    """Max imminence for speaker (subject='self'). Top-level in v1, nested in summary for v0."""
-
-    show_resources: Optional[bool] = None
-    """Whether to show crisis resources (v1 only)."""
-
-    # === Legacy v0 response fields (may not be present in v1) ===
-
-    communication: Optional[CommunicationAssessment] = None
-    """Communication style analysis (v0 only)."""
-
-    summary: Optional[Summary] = None
-    """Quick summary derived from risks (v0 only, use speaker_severity/speaker_imminence for v1)."""
-
-    legal_flags: Optional[LegalFlags] = None
-    """Legal/safety flags (v0 only)."""
-
-    protective_factors: Optional[ProtectiveFactorsInfo] = None
-    """Protective factors (v0 only)."""
-
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    """Overall confidence in assessment (v0 only)."""
-
-    agreement: Optional[float] = None
-    """Judge agreement if multiple judges used (v0 only)."""
-
-    crisis_resources: Optional[List[CrisisResource]] = None
-    """Crisis resources for user's region (v0 format)."""
-
-    resources: Optional[Dict[str, Any]] = None
-    """Crisis resources with 'why' explanations (v1 format). Contains primary and secondary keys."""
-
-    widget_url: Optional[str] = None
-    """Pre-built widget URL (only when speaker_severity > 'none')."""
-
-    recommended_reply: Optional[RecommendedReply] = None
-    """Recommended reply content."""
-
-    resource_query: Optional[str] = None
-    """LLM-generated query for resource matching."""
-
-    resource_tags: Optional[List[str]] = None
-    """LLM-generated tags for specialized resources."""
-
-    reflection: Optional[str] = None
-    """LLM reflection/reasoning (v0 only, use rationale for v1)."""
-
-    filter_result: Optional[FilterResult] = None
-    """Filter stage results (v0 only)."""
-
-    metadata: Optional[ResponseMetadata] = None
+    metadata: Optional[EvaluateMetadata] = None
     """Metadata about the request/response."""
 
 
 # =============================================================================
-# Screen Types (for legacy /v0/screen endpoint — use evaluate() instead)
+# Screen types (legacy /v0/screen; use evaluate() instead)
 # =============================================================================
 
 
 class ScreenRisk(BaseModel):
-    """Deprecated: use evaluate() and Risk instead. For the legacy /v0/screen endpoint."""
+    """Deprecated: a risk from the legacy ``/v0/screen`` route."""
 
     model_config = {"extra": "allow"}
 
     type: RiskType
     """What type of harm."""
 
-    subject: RiskSubject
-    """Who is at risk."""
+    subject: ScreenRiskSubject
+    """Who is at risk (the v0 route still emits ``unknown``)."""
 
     severity: Severity
     """How severe."""
@@ -684,7 +428,7 @@ class ScreenRisk(BaseModel):
 
 
 class ScreenRecommendedReply(BaseModel):
-    """Recommended supportive reply for screen response."""
+    """Recommended supportive reply for a screen response."""
 
     model_config = {"extra": "allow"}
 
@@ -695,72 +439,28 @@ class ScreenRecommendedReply(BaseModel):
     """Source of the reply (always 'llm_generated')."""
 
 
-class ScreenCrisisResourcePrimary(BaseModel):
-    """Primary crisis resource (e.g., 988 Lifeline)."""
-
-    model_config = {"extra": "allow"}  # Allow extra fields from API
-
-    name: str
-    description: Optional[str] = None
-    phone: Optional[str] = None
-    text: Optional[str] = None  # API may return text_instructions instead
-    text_instructions: Optional[str] = None
-    chat_url: Optional[str] = None
-    website_url: Optional[str] = None
-    availability: Optional[str] = None
-    languages: Optional[List[str]] = None
-
-
-class ScreenCrisisResourceSecondary(BaseModel):
-    """Secondary crisis resource (e.g., Crisis Text Line)."""
-
-    model_config = {"extra": "allow"}  # Allow extra fields from API
-
-    name: str
-    description: Optional[str] = None
-    text: Optional[str] = None  # API may return text_instructions instead
-    text_instructions: Optional[str] = None
-    sms_number: Optional[str] = None
-    chat_url: Optional[str] = None
-    website_url: Optional[str] = None
-    availability: Optional[str] = None
-    languages: Optional[List[str]] = None
-
-
 class ScreenCrisisResources(BaseModel):
-    """Deprecated: crisis resources from legacy /v0/screen endpoint."""
+    """Deprecated: crisis resources from the legacy ``/v0/screen`` route."""
 
-    primary: ScreenCrisisResourcePrimary
-    secondary: List[ScreenCrisisResourceSecondary]
+    model_config = {"extra": "allow"}
 
-
-class ScreenDisplayText(BaseModel):
-    """Suggested display text for crisis resources."""
-
-    short: str
-    """Short message (e.g., "If you're in crisis, call or text 988")."""
-
-    detailed: str
-    """Detailed message with more context."""
+    primary: CrisisResource
+    secondary: List[CrisisResource]
 
 
 class ScreenDebugInfo(BaseModel):
-    """Deprecated: debug information from legacy /v0/screen."""
+    """Deprecated: debug information from the legacy ``/v0/screen`` route."""
+
+    model_config = {"extra": "allow"}
 
     model: str
     latency_ms: int
-    raw_response: Optional[str] = None
 
 
 class ScreenResponse(BaseModel):
-    """
-    Deprecated: use evaluate() and EvaluateResponse instead.
-    Response from legacy /v0/screen endpoint.
+    """Deprecated: response from the legacy ``/v0/screen`` route."""
 
-    Multi-domain safety screening across all 9 risk types.
-    """
-
-    model_config = {"extra": "allow"}  # Allow extra fields from API
+    model_config = {"extra": "allow"}
 
     risks: List[ScreenRisk]
     """Detected risks with type, subject, severity, imminence."""
@@ -794,23 +494,23 @@ class ScreenResponse(BaseModel):
 
 
 class ScreenConfig(BaseModel):
-    """Deprecated: use evaluate() instead. Configuration for legacy /v0/screen endpoint."""
+    """Deprecated: configuration for the legacy ``/v0/screen`` route."""
 
     country: Optional[str] = None
     """ISO country code for locale-specific resources (default: 'US')."""
 
     debug: Optional[bool] = None
-    """Include debug info (latency, raw response)."""
+    """Include debug info (model, latency)."""
 
     include_recommended_reply: Optional[bool] = None
     """Generate a recommended supportive reply (additional ~$0.0005 cost)."""
 
 
 # =============================================================================
-# Utility Constants
+# Utility constants
 # =============================================================================
 
-SEVERITY_SCORES = {
+SEVERITY_SCORES: Dict[str, int] = {
     "none": 0,
     "mild": 1,
     "moderate": 2,
@@ -818,7 +518,7 @@ SEVERITY_SCORES = {
     "critical": 4,
 }
 
-IMMINENCE_SCORES = {
+IMMINENCE_SCORES: Dict[str, int] = {
     "not_applicable": 0,
     "chronic": 1,
     "subacute": 2,
@@ -828,73 +528,37 @@ IMMINENCE_SCORES = {
 
 
 # =============================================================================
-# Utility Functions
+# Utility functions
 # =============================================================================
 
 
 def calculate_speaker_severity(risks: List[Risk]) -> Severity:
-    """
-    Calculate speaker severity from risks array.
-
-    Only considers risks where subject='self'.
-    For v0 responses with subject_confidence, filters to confidence > 0.5.
-    For v1 responses (no subject_confidence), all self-risks are included.
-    """
-    speaker_risks = [
-        r
-        for r in risks
-        if r.subject == "self"
-        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
-    ]
-
+    """Max severity across risks where subject is ``self`` (``none`` when there are none)."""
+    speaker_risks = [r for r in risks if r.subject == "self"]
     if not speaker_risks:
         return "none"
-
     max_score = max(SEVERITY_SCORES[r.severity] for r in speaker_risks)
-
     for severity, score in SEVERITY_SCORES.items():
         if score == max_score:
-            return severity  # type: ignore
-
+            return severity  # type: ignore[return-value]
     return "none"
 
 
 def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
-    """
-    Calculate speaker imminence from risks array.
-
-    For v1 responses (no subject_confidence), all self-risks are included.
-    """
-    speaker_risks = [
-        r
-        for r in risks
-        if r.subject == "self"
-        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
-    ]
-
+    """Max imminence across risks where subject is ``self``."""
+    speaker_risks = [r for r in risks if r.subject == "self"]
     if not speaker_risks:
         return "not_applicable"
-
     max_score = max(IMMINENCE_SCORES[r.imminence] for r in speaker_risks)
-
     for imminence, score in IMMINENCE_SCORES.items():
         if score == max_score:
-            return imminence  # type: ignore
-
+            return imminence  # type: ignore[return-value]
     return "not_applicable"
 
 
 def has_third_party_risk(risks: List[Risk]) -> bool:
-    """
-    Check if any third-party risk exists.
-
-    For v1 responses (no subject_confidence), all other-risks are included.
-    """
-    return any(
-        r.subject == "other"
-        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
-        for r in risks
-    )
+    """True when any risk has subject ``other``."""
+    return any(r.subject == "other" for r in risks)
 
 
 # =============================================================================

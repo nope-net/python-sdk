@@ -21,6 +21,7 @@ from ._http import (
     parse_response_meta,
     retry_wait_seconds,
 )
+from ._requests import build_evaluate_request, build_screen_request
 from .types import (
     DetectCountryResponse,
     EvaluateConfig,
@@ -63,7 +64,7 @@ class NopeClient:
         client = NopeClient(api_key="nope_live_...")
         result = client.evaluate(
             messages=[{"role": "user", "content": "I'm feeling down"}],
-            config={"user_country": "US"}
+            config={"country": "US"}
         )
         print(result.speaker_severity)
         ```
@@ -144,31 +145,36 @@ class NopeClient:
         messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
-        user_context: Optional[str] = None,
-        proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
         """
-        Evaluate conversation messages for safety risks.
+        Evaluate a conversation for safety risks ($0.003 per call).
 
-        Either `messages` or `text` must be provided, but not both.
+        Exactly one of ``messages`` or ``text`` must be given. Messages are
+        validated client-side (non-empty, at most 100, role ``user`` or
+        ``assistant``); the API applies the same limits.
 
         Args:
-            messages: List of conversation messages. Each message should have
-                'role' ('user' or 'assistant') and 'content'.
-            text: Plain text input (for free-form transcripts or session notes).
-            config: Configuration options including user_country, locale, etc.
-            user_context: Free-text context about the user to help shape responses.
-            proposed_response: Optional proposed AI response to evaluate for appropriateness.
+            messages: Conversation messages, each ``{"role": "user" | "assistant",
+                "content": str}``.
+            text: Plain text input (free-form transcripts or session notes).
+            config: ``country`` (ISO 3166-1 alpha-2, default US), ``include_resources``
+                (default true), ``conversation_id`` and ``end_user_id`` (webhook
+                correlation). In demo mode the client mirrors ``country`` into
+                ``user_country`` because the try route reads that key, and the demo
+                route always includes resources.
 
         Returns:
-            EvaluateResponse with risks, speaker_severity, rationale, resources, etc.
+            EvaluateResponse with ``risks``, ``speaker_severity``, ``speaker_imminence``,
+            ``rationale``, ``show_resources`` and, when shown, typed ``resources``.
 
         Raises:
             NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
+            NopeValidationError: Invalid request payload (400) or body over 512 KB (413).
+            NopeInsufficientBalanceError: Balance cannot cover the call (402).
+            NopeRateLimitError: Rate limit exceeded after the retries.
+            NopeServiceUnavailableError: Every classification provider was down.
+            NopeServerError: Other server error.
+            NopeConnectionError: Connection failed or timed out.
 
         Example:
             ```python
@@ -176,58 +182,22 @@ class NopeClient:
                 messages=[
                     {"role": "user", "content": "I've been feeling really down lately"},
                     {"role": "assistant", "content": "I hear you. Can you tell me more?"},
-                    {"role": "user", "content": "I just don't see the point anymore"}
+                    {"role": "user", "content": "I just don't see the point anymore"},
                 ],
-                config={"user_country": "US"}
+                config={"country": "US"},
             )
 
             if result.speaker_severity in ("high", "critical"):
                 print("High risk detected")
-                if result.resources and result.resources.get("primary"):
-                    primary = result.resources["primary"]
-                    print(f"  {primary['name']}: {primary['phone']}")
+                if result.resources:
+                    primary = result.resources.primary
+                    print(f"  {primary.name}: {primary.phone}")
             ```
         """
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        # Build request payload
-        payload: Dict[str, Any] = {}
-
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-
-        if text is not None:
-            payload["text"] = text
-
-        if config is not None:
-            if isinstance(config, dict):
-                config_dict = dict(config)
-            else:
-                config_dict = config.model_dump(exclude_none=True)
-        else:
-            config_dict = {}
-
-        # Map deprecated user_country → country for v1 API
-        if config_dict.get("user_country") and not config_dict.get("country"):
-            config_dict["country"] = config_dict["user_country"]
-
-        payload["config"] = config_dict
-
-        if user_context is not None:
-            payload["user_context"] = user_context
-
-        if proposed_response is not None:
-            payload["proposed_response"] = proposed_response
-
-        # Make request
-        endpoint = "/v1/try/evaluate" if self.demo else "/v1/evaluate"
-        response = self._request("POST", endpoint, json=payload)
-
+        path, payload = build_evaluate_request(
+            messages=messages, text=text, config=config, demo=self.demo
+        )
+        response = self._request("POST", path, json=payload)
         return EvaluateResponse.model_validate(response)
 
     def screen(
@@ -238,33 +208,23 @@ class NopeClient:
         config: Optional[Union[ScreenConfig, Dict[str, Any]]] = None,
     ) -> ScreenResponse:
         """
-        Lightweight crisis screening (legacy).
+        Lightweight crisis screening (legacy ``/v0/screen``, $0.001 per call).
 
         .. deprecated::
-            Use :meth:`evaluate` instead. The screen endpoint has been consolidated
-            into evaluate ($0.003/call). This method calls the legacy
-            ``/v0/screen`` endpoint ($0.001/call).
+            Use :meth:`evaluate` instead. Kept while the v0 route is served;
+            no sunset date has been set. Not available in demo mode.
 
-        Fast, cheap endpoint for detecting suicidal ideation and self-harm.
-        Returns independent detection flags for suicidal ideation and self-harm,
-        tuned conservatively (biased toward detection).
-
-        Either `messages` or `text` must be provided, but not both.
+        Returns independent ``suicidal_ideation`` and ``self_harm`` flags plus a
+        ``risks`` array, tuned conservatively (biased toward detection).
 
         Args:
-            messages: List of conversation messages.
-            text: Plain text input (for free-form transcripts).
-            config: Configuration options (currently only debug flag).
+            messages: Conversation messages.
+            text: Plain text input.
+            config: ``country``, ``debug``, ``include_recommended_reply``.
 
         Returns:
-            ScreenResponse with show_resources, suicidal_ideation, self_harm flags.
-
-        Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
+            ScreenResponse with ``show_resources``, ``suicidal_ideation``, ``self_harm``
+            and typed ``resources`` (primary plus secondary ``CrisisResource``).
 
         Example:
             ```python
@@ -272,7 +232,6 @@ class NopeClient:
 
             if result.show_resources:
                 print(f"SI: {result.suicidal_ideation}, SH: {result.self_harm}")
-                print(f"Rationale: {result.rationale}")
                 if result.resources:
                     print(f"Call {result.resources.primary.phone}")
             ```
@@ -283,38 +242,13 @@ class NopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
-
         if self.demo:
             raise ValueError(
-                "screen() is not available in demo mode. Use evaluate() instead — "
-                "it is available via /v1/try/evaluate."
+                "screen() is not available in demo mode. Use evaluate(), "
+                "which routes to /v1/try/evaluate."
             )
-
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        # Build request payload
-        payload: Dict[str, Any] = {}
-
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-
-        if text is not None:
-            payload["text"] = text
-
-        if config is not None:
-            if isinstance(config, dict):
-                payload["config"] = config
-            else:
-                payload["config"] = config.model_dump(exclude_none=True)
-
-        # Legacy v0 endpoint (requires authentication)
-        response = self._request("POST", "/v0/screen", json=payload)
-
+        path, payload = build_screen_request(messages=messages, text=text, config=config)
+        response = self._request("POST", path, json=payload)
         return ScreenResponse.model_validate(response)
 
     def ocular(
@@ -1017,7 +951,7 @@ class AsyncNopeClient:
         async with AsyncNopeClient(api_key="nope_live_...") as client:
             result = await client.evaluate(
                 messages=[{"role": "user", "content": "I'm feeling down"}],
-                config={"user_country": "US"}
+                config={"country": "US"}
             )
             print(result.speaker_severity)
         ```
@@ -1088,52 +1022,16 @@ class AsyncNopeClient:
         messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
-        user_context: Optional[str] = None,
-        proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
         """
-        Evaluate conversation messages for safety risks.
+        Evaluate a conversation for safety risks.
 
         See NopeClient.evaluate for full documentation.
         """
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        payload: Dict[str, Any] = {}
-
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-
-        if text is not None:
-            payload["text"] = text
-
-        if config is not None:
-            if isinstance(config, dict):
-                config_dict = dict(config)
-            else:
-                config_dict = config.model_dump(exclude_none=True)
-        else:
-            config_dict = {}
-
-        # Map deprecated user_country → country for v1 API
-        if config_dict.get("user_country") and not config_dict.get("country"):
-            config_dict["country"] = config_dict["user_country"]
-
-        payload["config"] = config_dict
-
-        if user_context is not None:
-            payload["user_context"] = user_context
-
-        if proposed_response is not None:
-            payload["proposed_response"] = proposed_response
-
-        endpoint = "/v1/try/evaluate" if self.demo else "/v1/evaluate"
-        response = await self._request("POST", endpoint, json=payload)
-
+        path, payload = build_evaluate_request(
+            messages=messages, text=text, config=config, demo=self.demo
+        )
+        response = await self._request("POST", path, json=payload)
         return EvaluateResponse.model_validate(response)
 
     async def screen(
@@ -1155,37 +1053,13 @@ class AsyncNopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
-
         if self.demo:
             raise ValueError(
-                "screen() is not available in demo mode. Use evaluate() instead — "
-                "it is available via /v1/try/evaluate."
+                "screen() is not available in demo mode. Use evaluate(), "
+                "which routes to /v1/try/evaluate."
             )
-
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        payload: Dict[str, Any] = {}
-
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-
-        if text is not None:
-            payload["text"] = text
-
-        if config is not None:
-            if isinstance(config, dict):
-                payload["config"] = config
-            else:
-                payload["config"] = config.model_dump(exclude_none=True)
-
-        # Legacy v0 endpoint (requires authentication)
-        response = await self._request("POST", "/v0/screen", json=payload)
-
+        path, payload = build_screen_request(messages=messages, text=text, config=config)
+        response = await self._request("POST", path, json=payload)
         return ScreenResponse.model_validate(response)
 
     async def ocular(

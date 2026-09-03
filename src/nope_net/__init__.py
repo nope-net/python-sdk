@@ -1,8 +1,9 @@
 """
 NOPE Python SDK
 
-Safety layer for chat & LLMs. Analyzes conversations for mental-health
-and safeguarding risk.
+Safety layer for chat and LLMs: risk classification for conversations, AI
+behaviour oversight, crisis resources, and the billing and webhook management
+routes of the NOPE API.
 
 Example:
     ```python
@@ -11,12 +12,12 @@ Example:
     client = NopeClient(api_key="nope_live_...")
     result = client.evaluate(
         messages=[{"role": "user", "content": "I'm feeling down"}],
-        config={"user_country": "US"}
+        config={"country": "US"},
     )
 
     print(f"Severity: {result.speaker_severity}")
-    if result.resources and result.resources.get("primary"):
-        print(f"  {result.resources['primary']['name']}: {result.resources['primary']['phone']}")
+    if result.resources:
+        print(f"  {result.resources.primary.name}: {result.resources.primary.phone}")
     ```
 """
 
@@ -38,28 +39,26 @@ from .types import (
     IMMINENCE_SCORES,
     SEVERITY_SCORES,
     AggregatedBehavior,
-    CommunicationAssessment,
-    CommunicationStyleAssessment,
-    # Oversight types
     ConcernLevel,
-    # Supporting types
     CrisisResource,
+    CrisisResourceKind,
+    CrisisResourcePriorityTier,
+    CrisisResourceType,
     DetectCountryResponse,
     DetectedBehavior,
     EvaluateConfig,
+    EvaluateMetadata,
     EvaluateRequest,
-    # Core response types
+    EvaluateResource,
+    EvaluateResources,
     EvaluateResponse,
-    FilterResult,
+    HoursConfidence,
     HumanIndicator,
     HumanIndicatorType,
-    IPVFlags,
-    LegalFlags,
-    # Request types
+    Imminence,
     Message,
     OcularAxis,
     OcularMeta,
-    # Ocular types
     OcularResponse,
     OcularSignals,
     OcularStability,
@@ -78,40 +77,31 @@ from .types import (
     OversightIngestResponse,
     OversightMessage,
     OversightSeverity,
-    PreliminaryRisk,
-    ProtectiveFactorsInfo,
-    # Resources types
     RankedResource,
-    RecommendedReply,
     ResourceByIdResponse,
+    ResourceProminence,
     ResourcesConfig,
     ResourcesCountriesResponse,
     ResourcesResponse,
     ResourcesSmartResponse,
-    ResponseMetadata,
     Risk,
-    SafeguardingConcernFlags,
-    # Screen types
+    RiskSubject,
+    RiskType,
     ScreenConfig,
-    ScreenCrisisResourcePrimary,
     ScreenCrisisResources,
-    ScreenCrisisResourceSecondary,
     ScreenDebugInfo,
-    ScreenDisplayText,
     ScreenRecommendedReply,
     ScreenResponse,
     ScreenRisk,
+    ScreenRiskSubject,
+    Severity,
     SignpostSearchResponse,
-    # Signpost search types
     SignpostSearchResult,
     SignpostSearchTiming,
-    StalkingFlags,
-    Summary,
-    ThirdPartyThreatFlags,
     Trajectory,
+    TruncationWarning,
     TurnAnalysis,
     calculate_speaker_imminence,
-    # Utility functions
     calculate_speaker_severity,
     has_third_party_risk,
 )
@@ -129,6 +119,7 @@ from .webhook import (
 __version__ = "4.0.0"
 
 __all__ = [
+    "__version__",
     # Clients
     "NopeClient",
     "AsyncNopeClient",
@@ -147,41 +138,38 @@ __all__ = [
     "ResponseMeta",
     "RateLimitMeta",
     "BalanceMeta",
-    # Request types
+    # Enums / literals
+    "RiskSubject",
+    "ScreenRiskSubject",
+    "RiskType",
+    "Severity",
+    "Imminence",
+    "CrisisResourceType",
+    "CrisisResourceKind",
+    "CrisisResourcePriorityTier",
+    "HoursConfidence",
+    "ResourceProminence",
+    # Evaluate
     "Message",
     "EvaluateConfig",
     "EvaluateRequest",
-    # Core response types
     "EvaluateResponse",
+    "EvaluateMetadata",
+    "EvaluateResource",
+    "EvaluateResources",
     "Risk",
-    "Summary",
-    "CommunicationAssessment",
-    "CommunicationStyleAssessment",
-    # Supporting types
+    # Crisis resources
     "CrisisResource",
     "OtherContact",
     "OpenStatus",
-    "LegalFlags",
-    "IPVFlags",
-    "SafeguardingConcernFlags",
-    "ThirdPartyThreatFlags",
-    "StalkingFlags",
-    "ProtectiveFactorsInfo",
-    "FilterResult",
-    "PreliminaryRisk",
-    "RecommendedReply",
-    "ResponseMetadata",
-    # Screen types
+    # Screen (deprecated)
     "ScreenConfig",
     "ScreenResponse",
     "ScreenRisk",
     "ScreenRecommendedReply",
     "ScreenCrisisResources",
-    "ScreenCrisisResourcePrimary",
-    "ScreenCrisisResourceSecondary",
-    "ScreenDisplayText",
     "ScreenDebugInfo",
-    # Resources types
+    # Resources / signpost
     "RankedResource",
     "ResourcesConfig",
     "ResourcesResponse",
@@ -189,18 +177,17 @@ __all__ = [
     "ResourceByIdResponse",
     "ResourcesCountriesResponse",
     "DetectCountryResponse",
-    # Signpost search types
     "SignpostSearchResult",
     "SignpostSearchTiming",
     "SignpostSearchResponse",
-    # Ocular types
+    # Ocular
     "OcularResponse",
     "OcularAxis",
     "OcularSignals",
     "OcularStability",
     "OcularTrajectoryEntry",
     "OcularMeta",
-    # Oversight types
+    # Oversight
     "ConcernLevel",
     "Trajectory",
     "OversightSeverity",
@@ -220,7 +207,8 @@ __all__ = [
     "OversightIngestConversationResult",
     "OversightIngestError",
     "OversightIngestResponse",
-    # Utility functions
+    "TruncationWarning",
+    # Utilities
     "calculate_speaker_severity",
     "calculate_speaker_imminence",
     "has_third_party_risk",
