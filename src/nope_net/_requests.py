@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from pydantic import BaseModel
 
+from .errors import NopeValidationError
+
 MAX_EVALUATE_MESSAGES = 100
 MAX_INGEST_CONVERSATIONS = 300
 OVERSIGHT_SEVERITIES = ("low", "medium", "high", "critical")
@@ -17,6 +19,16 @@ MAX_TRAJECTORY_STRIDE = 64
 MAX_OCULAR_IDENTITY_LENGTH = 256
 
 JsonDict = Dict[str, Any]
+
+
+def invalid_request(message: str) -> NopeValidationError:
+    """The error every client-side input check raises (no request was sent)."""
+    return NopeValidationError(message, status_code=None, code="invalid_request")
+
+
+def not_available_in_demo(message: str) -> NopeValidationError:
+    """The error a demo client gets from a method that has no ``/v1/try/*`` route."""
+    return NopeValidationError(message, status_code=None, code="not_available_in_demo")
 
 
 def dump(value: Union[BaseModel, JsonDict]) -> JsonDict:
@@ -34,18 +46,20 @@ def normalize_messages(
 ) -> List[JsonDict]:
     """Validate and serialise a message list."""
     if len(messages) == 0:
-        raise ValueError("'messages' cannot be empty")
+        raise invalid_request("'messages' cannot be empty")
     if max_messages is not None and len(messages) > max_messages:
-        raise ValueError(f"Too many messages: {len(messages)}. Maximum allowed: {max_messages}")
+        raise invalid_request(
+            f"Too many messages: {len(messages)}. Maximum allowed: {max_messages}"
+        )
     out: List[JsonDict] = []
     for index, message in enumerate(messages):
         data = dump(message)
         role = data.get("role")
         if role not in allowed_roles:
             allowed = " or ".join(repr(r) for r in allowed_roles)
-            raise ValueError(f"Message {index}: role must be {allowed}, got {role!r}")
+            raise invalid_request(f"Message {index}: role must be {allowed}, got {role!r}")
         if not isinstance(data.get("content"), str):
-            raise ValueError(f"Message {index}: content must be a string")
+            raise invalid_request(f"Message {index}: content must be a string")
         out.append(data)
     return out
 
@@ -58,9 +72,9 @@ def _messages_or_text(
     max_messages: Optional[int],
 ) -> JsonDict:
     if messages is None and text is None:
-        raise ValueError("Either 'messages' or 'text' must be provided")
+        raise invalid_request("Either 'messages' or 'text' must be provided")
     if messages is not None and text is not None:
-        raise ValueError("Only one of 'messages' or 'text' can be provided")
+        raise invalid_request("Only one of 'messages' or 'text' can be provided")
     payload: JsonDict = {}
     if messages is not None:
         payload["messages"] = normalize_messages(
@@ -125,25 +139,25 @@ def _validate_oversight_conversation(
     label = "conversation" if index is None else f"Conversation at index {index}"
     messages = conversation.get("messages")
     if messages is None:
-        raise ValueError(f'"{label}.messages" is required')
+        raise invalid_request(f'"{label}.messages" is required')
     if not isinstance(messages, list):
-        raise ValueError(f'"{label}.messages" must be a list')
+        raise invalid_request(f'"{label}.messages" must be a list')
     if len(messages) == 0:
-        raise ValueError(f'"{label}.messages" cannot be empty')
+        raise invalid_request(f'"{label}.messages" cannot be empty')
     for position, message in enumerate(messages):
         role = message.get("role") if isinstance(message, dict) else None
         if role not in ("user", "assistant", "system"):
-            raise ValueError(
+            raise invalid_request(
                 f"{label}: message {position} role must be 'user', 'assistant' or 'system'"
             )
 
 
 def _validate_behavior_filter(behaviors: JsonDict) -> None:
     if behaviors.get("enabled") and behaviors.get("disabled"):
-        raise ValueError('"behaviors.enabled" and "behaviors.disabled" are mutually exclusive')
+        raise invalid_request('"behaviors.enabled" and "behaviors.disabled" are mutually exclusive')
     min_severity = behaviors.get("min_severity")
     if min_severity is not None and min_severity not in OVERSIGHT_SEVERITIES:
-        raise ValueError(
+        raise invalid_request(
             '"behaviors.min_severity" must be one of: ' + ", ".join(OVERSIGHT_SEVERITIES)
         )
 
@@ -180,9 +194,9 @@ def build_oversight_ingest_request(
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for ``oversight_ingest`` (client cap 300 conversations)."""
     if not conversations:
-        raise ValueError('"conversations" cannot be empty')
+        raise invalid_request('"conversations" cannot be empty')
     if len(conversations) > MAX_INGEST_CONVERSATIONS:
-        raise ValueError(
+        raise invalid_request(
             f"Too many conversations: {len(conversations)}. "
             f"Maximum allowed: {MAX_INGEST_CONVERSATIONS}"
         )
@@ -190,9 +204,9 @@ def build_oversight_ingest_request(
     for index, conversation in enumerate(conversations):
         data = dump(conversation)
         if not data.get("conversation_id"):
-            raise ValueError(f'Conversation at index {index} must have a "conversation_id"')
+            raise invalid_request(f'Conversation at index {index} must have a "conversation_id"')
         if not data.get("messages"):
-            raise ValueError(
+            raise invalid_request(
                 f'Conversation "{data["conversation_id"]}" must have non-empty "messages"'
             )
         conversation_list.append(data)
@@ -230,10 +244,10 @@ def build_ocular_request(
         messages, text, allowed_roles=("user", "assistant"), max_messages=None
     )
     if trajectory_stride is not None and not 1 <= trajectory_stride <= MAX_TRAJECTORY_STRIDE:
-        raise ValueError(f"trajectory_stride must be between 1 and {MAX_TRAJECTORY_STRIDE}")
+        raise invalid_request(f"trajectory_stride must be between 1 and {MAX_TRAJECTORY_STRIDE}")
     for name, value in (("user_id", user_id), ("session_id", session_id), ("agent_id", agent_id)):
         if value is not None and not 1 <= len(value) <= MAX_OCULAR_IDENTITY_LENGTH:
-            raise ValueError(f"{name} must be 1 to {MAX_OCULAR_IDENTITY_LENGTH} characters")
+            raise invalid_request(f"{name} must be 1 to {MAX_OCULAR_IDENTITY_LENGTH} characters")
     if per_turn is not None:
         payload["per_turn"] = per_turn
     if trajectory_stride is not None:
@@ -301,7 +315,7 @@ def build_signpost_smart_params(
 ) -> Dict[str, str]:
     """Query params for the smart (LLM-ranked) lookup."""
     if not query:
-        raise ValueError("'query' is required")
+        raise invalid_request("'query' is required")
     cfg = dump(config) if config is not None else {}
     params: Dict[str, str] = {"country": country.upper(), "query": query}
     for key in ("scopes", "populations"):
@@ -322,7 +336,7 @@ def build_signpost_search_params(
 ) -> Dict[str, str]:
     """Query params for vector search."""
     if not query:
-        raise ValueError("'query' is required")
+        raise invalid_request("'query' is required")
     params: Dict[str, str] = {"query": query}
     if country:
         params["country"] = country.upper()

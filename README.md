@@ -61,8 +61,10 @@ if result.show_resources and result.resources:
 A client built with `demo=True` needs no key and routes to the `/v1/try/*`
 endpoints, which are free and rate-limited per IP (10 evaluate calls per
 minute). Four methods have a demo route: `evaluate`, `oversight_analyze`,
-`ocular` and `signpost_smart`. Every other method raises `ValueError` on a
-demo client.
+`ocular` and `signpost_smart`. The public routes (`signpost_by_id`,
+`signpost_countries`, `detect_country`, `billing.pricing`) work on a demo
+client too. Every other method raises `NopeValidationError` (also a
+`ValueError`) with `code` `not_available_in_demo` before any request is sent.
 
 ```python
 from nope_net import NopeClient

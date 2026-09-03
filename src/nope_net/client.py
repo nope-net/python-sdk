@@ -32,6 +32,7 @@ from ._requests import (
     build_signpost_params,
     build_signpost_search_params,
     build_signpost_smart_params,
+    not_available_in_demo,
 )
 from .types import (
     DetectCountryResponse,
@@ -121,7 +122,8 @@ class NopeClient:
             base_url: Override the API base URL. Defaults to https://api.nope.net.
             timeout: Request timeout in seconds. Defaults to 30.
             demo: Route to the ``/v1/try/*`` endpoints, which need no key. Rate-limited
-                  per IP; methods with no demo route raise ``ValueError``.
+                  per IP; methods with no demo route raise ``NopeValidationError``
+                  (``code`` ``not_available_in_demo``).
             max_retries: How many times a 429 or 503 is retried (default 2). Waits honour
                   ``Retry-After`` (capped at 30 s). Timeouts, connection failures and
                   other 5xx are never retried: paid routes charge before the handler
@@ -201,7 +203,9 @@ class NopeClient:
 
         Raises:
             NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload (400) or body over 512 KB (413).
+            NopeValidationError: A client-side check failed (``status_code`` None,
+                ``code`` ``invalid_request``), the API rejected the payload (400), or
+                the body was over 512 KB (413).
             NopeInsufficientBalanceError: Balance cannot cover the call (402).
             NopeRateLimitError: Rate limit exceeded after the retries.
             NopeServiceUnavailableError: Every classification provider was down.
@@ -275,7 +279,7 @@ class NopeClient:
             stacklevel=2,
         )
         if self.demo:
-            raise ValueError(
+            raise not_available_in_demo(
                 "screen() is not available in demo mode. Use evaluate(), "
                 "which routes to /v1/try/evaluate."
             )
@@ -330,8 +334,9 @@ class NopeClient:
             route ignores ``thoroughness`` and the identity fields.
 
         Raises:
-            ValueError: Neither or both inputs, a bad role, ``trajectory_stride``
-                outside 1..64, or an identity field outside 1..256 characters.
+            NopeValidationError: Neither or both inputs, a bad role,
+                ``trajectory_stride`` outside 1..64, or an identity field outside
+                1..256 characters (client-side, ``status_code`` None).
             NopeFeatureError: Ocular is not enabled for this account.
             NopeServerError: Upstream gateway error.
 
@@ -405,8 +410,9 @@ class NopeClient:
             caps input at 20 messages.
 
         Raises:
-            ValueError: Empty messages, bad role, ``enabled`` and ``disabled`` both
-                non-empty, or an invalid ``min_severity``.
+            NopeValidationError: Empty messages, bad role, ``enabled`` and
+                ``disabled`` both non-empty, or an invalid ``min_severity``
+                (client-side, ``status_code`` None).
             NopeFeatureError: Oversight is not enabled for this account.
             NopeInsufficientBalanceError: Balance cannot cover the call.
 
@@ -472,8 +478,9 @@ class NopeClient:
             OversightIngestResponse with per-conversation results and errors.
 
         Raises:
-            ValueError: Demo mode, empty list, more than 300 conversations, or a
-                conversation without ``conversation_id``/``messages``.
+            NopeValidationError: Demo mode, empty list, more than 300
+                conversations, or a conversation without
+                ``conversation_id``/``messages`` (client-side, ``status_code`` None).
             NopeFeatureError: Oversight is not enabled for this account.
             NopeInsufficientBalanceError: Balance cannot cover 100 mills per conversation.
 
@@ -492,7 +499,9 @@ class NopeClient:
             ```
         """
         if self.demo:
-            raise ValueError("Oversight ingest is not available in demo mode. Use an API key.")
+            raise not_available_in_demo(
+                "Oversight ingest is not available in demo mode. Use an API key."
+            )
         path, payload = build_oversight_ingest_request(
             conversations=conversations, webhook_url=webhook_url, config=config
         )
@@ -538,8 +547,8 @@ class NopeClient:
             service.
 
         Raises:
-            ValueError: Demo mode.
-            NopeValidationError: Unknown scope or population (``details.invalid_scopes``).
+            NopeValidationError: Demo mode (``code`` ``not_available_in_demo``), or
+                an unknown scope or population (400, ``details.invalid_scopes``).
 
         Example:
             ```python
@@ -549,7 +558,7 @@ class NopeClient:
             ```
         """
         if self.demo:
-            raise ValueError("signpost() is not available in demo mode. Use an API key.")
+            raise not_available_in_demo("signpost() is not available in demo mode. Use an API key.")
         params = build_signpost_params(
             country=country,
             config=config,
@@ -627,7 +636,9 @@ class NopeClient:
             ```
         """
         if self.demo:
-            raise ValueError("signpost_search() is not available in demo mode. Use an API key.")
+            raise not_available_in_demo(
+                "signpost_search() is not available in demo mode. Use an API key."
+            )
         params = build_signpost_search_params(
             query=query, country=country, limit=limit, threshold=threshold
         )
@@ -881,7 +892,7 @@ class AsyncNopeClient:
             stacklevel=2,
         )
         if self.demo:
-            raise ValueError(
+            raise not_available_in_demo(
                 "screen() is not available in demo mode. Use evaluate(), "
                 "which routes to /v1/try/evaluate."
             )
@@ -960,7 +971,9 @@ class AsyncNopeClient:
         See NopeClient.oversight_ingest for full documentation.
         """
         if self.demo:
-            raise ValueError("Oversight ingest is not available in demo mode. Use an API key.")
+            raise not_available_in_demo(
+                "Oversight ingest is not available in demo mode. Use an API key."
+            )
         path, payload = build_oversight_ingest_request(
             conversations=conversations, webhook_url=webhook_url, config=config
         )
@@ -987,7 +1000,7 @@ class AsyncNopeClient:
         documentation.
         """
         if self.demo:
-            raise ValueError("signpost() is not available in demo mode. Use an API key.")
+            raise not_available_in_demo("signpost() is not available in demo mode. Use an API key.")
         params = build_signpost_params(
             country=country,
             config=config,
@@ -1029,7 +1042,9 @@ class AsyncNopeClient:
         NopeClient for full documentation.
         """
         if self.demo:
-            raise ValueError("signpost_search() is not available in demo mode. Use an API key.")
+            raise not_available_in_demo(
+                "signpost_search() is not available in demo mode. Use an API key."
+            )
         params = build_signpost_search_params(
             query=query, country=country, limit=limit, threshold=threshold
         )

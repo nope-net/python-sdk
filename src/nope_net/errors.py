@@ -11,6 +11,11 @@ Every error raised from an HTTP response carries:
   HTTP status text.
 - ``response_body``: the raw response text.
 
+Client-side validation and demo-mode refusals raise ``NopeValidationError``
+before any request is sent: ``status_code`` is ``None``, ``code`` is
+``invalid_request`` or ``not_available_in_demo``, and the class is also a
+``ValueError``.
+
 The status-to-class mapping lives in ``nope_net._http.build_error`` and is shared
 by the sync and async clients.
 """
@@ -58,19 +63,25 @@ class NopeAuthError(NopeError):
         super().__init__(message, status_code=401, code=code, response_body=response_body)
 
 
-class NopeValidationError(NopeError):
-    """HTTP 400 or 413: the request was rejected before processing.
+class NopeValidationError(NopeError, ValueError):
+    """The request was rejected: HTTP 400 or 413, or a client-side check.
 
     ``details`` holds every extra key the body carried beside ``error`` and
     ``message`` (``max_bytes`` on 413, ``max_messages``, ``max_content_length``,
     ``invalid_scopes``, ``hint``, and the Oversight validator's own ``details``).
+
+    Raised before any request is sent when the SDK's own validation fails
+    (``code`` ``invalid_request``) or a demo client calls a method with no
+    ``/v1/try/*`` route (``code`` ``not_available_in_demo``); ``status_code``
+    is ``None`` and ``details`` is empty in both cases. The class is also a
+    ``ValueError``, so ``except ValueError`` keeps working.
     """
 
     def __init__(
         self,
         message: str = "Invalid request",
         *,
-        status_code: int = 400,
+        status_code: Optional[int] = 400,
         code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         response_body: Optional[str] = None,

@@ -10,7 +10,7 @@ here has a demo route.
 import json
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
-from ._requests import JsonDict, dump
+from ._requests import JsonDict, dump, invalid_request, not_available_in_demo
 from .errors import NopeServerError
 from .types import (
     BillingBalanceResponse,
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 
 def _demo_guard(demo: bool, name: str) -> None:
     if demo:
-        raise ValueError(f"{name}() is not available in demo mode. Use an API key.")
+        raise not_available_in_demo(f"{name}() is not available in demo mode. Use an API key.")
 
 
 def build_webhook_create_body(
@@ -50,7 +50,7 @@ def build_webhook_create_body(
     include_conversation: Optional[bool],
 ) -> JsonDict:
     if not url:
-        raise ValueError("'url' is required")
+        raise invalid_request("'url' is required")
     body: JsonDict = {"url": url}
     if min_risk_level is not None:
         body["min_risk_level"] = min_risk_level
