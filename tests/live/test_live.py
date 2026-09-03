@@ -116,18 +116,16 @@ async def test_row02_evaluate_text(
 async def test_row03_evaluate_demo(demo: ClientRunner, ledger: CostLedger) -> None:
     ledger.take_demo_evaluate()
     result = await demo.call("evaluate", messages=CONCERNING, config={"country": "GB"})
+    ledger.take_demo_evaluate()
+    without = await demo.call(
+        "evaluate", messages=CONCERNING, config={"country": "GB", "include_resources": False}
+    )
     await _done(demo, ledger)
 
     assert result.metadata is not None and result.metadata.try_endpoint is True
     assert result.metadata.model
     assert result.resources is not None, "demo evaluate returns resources by default"
     assert "GB" in (result.resources.primary.country_codes or [])
-
-    ledger.take_demo_evaluate()
-    without = await demo.call(
-        "evaluate", messages=CONCERNING, config={"country": "GB", "include_resources": False}
-    )
-    await _done(demo, ledger)
     # show_resources is derived from the risk; include_resources=False only omits the block.
     assert isinstance(without.show_resources, bool) and without.resources is None
 
