@@ -10,6 +10,9 @@ Every error raised from an HTTP response carries:
 - ``message``: ``body.message`` when present, else ``body.error``, else the
   HTTP status text.
 - ``response_body``: the raw response text.
+- ``body``: the parsed JSON object when the response was one, else ``None``.
+- ``details``: the body's extra keys on a validation error; ``{}`` on every
+  other error, so ``err.details`` never raises ``AttributeError``.
 
 Client-side validation and demo-mode refusals raise ``NopeValidationError``
 before any request is sent: ``status_code`` is ``None``, ``code`` is
@@ -33,12 +36,17 @@ class NopeError(Exception):
         status_code: Optional[int] = None,
         code: Optional[str] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
         self.code = code
         self.response_body = response_body
+        self.body = body
+        """The response decoded as a JSON object, or ``None`` when it was not one."""
+        self.details: Dict[str, Any] = {}
+        """Extra keys from the body; filled by ``NopeValidationError``, ``{}`` elsewhere."""
 
     def __str__(self) -> str:
         parts = []
@@ -59,8 +67,11 @@ class NopeAuthError(NopeError):
         *,
         code: Optional[str] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=401, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=401, code=code, response_body=response_body, body=body
+        )
 
 
 class NopeValidationError(NopeError, ValueError):
@@ -85,9 +96,12 @@ class NopeValidationError(NopeError, ValueError):
         code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=status_code, code=code, response_body=response_body)
-        self.details: Dict[str, Any] = details or {}
+        super().__init__(
+            message, status_code=status_code, code=code, response_body=response_body, body=body
+        )
+        self.details = details or {}
 
 
 class NopeInsufficientBalanceError(NopeError):
@@ -111,8 +125,11 @@ class NopeInsufficientBalanceError(NopeError):
         per_conversation_mills: Optional[float] = None,
         conversations: Optional[int] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=402, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=402, code=code, response_body=response_body, body=body
+        )
         self.balance_mills = balance_mills
         self.required_mills = required_mills
         self.formatted_current = formatted_current
@@ -139,8 +156,11 @@ class NopeFeatureError(NopeError):
         required_access: Optional[str] = None,
         upgrade_url: Optional[str] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=403, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=403, code=code, response_body=response_body, body=body
+        )
         self.feature = feature
         self.required_access = required_access
         self.upgrade_url = upgrade_url
@@ -161,8 +181,11 @@ class NopeNotFoundError(NopeError):
         *,
         code: Optional[str] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=404, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=404, code=code, response_body=response_body, body=body
+        )
 
 
 class NopeRateLimitError(NopeError):
@@ -183,8 +206,11 @@ class NopeRateLimitError(NopeError):
         remaining: Optional[int] = None,
         reset: Optional[int] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=429, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=429, code=code, response_body=response_body, body=body
+        )
         self.retry_after = retry_after
         self.limit = limit
         self.remaining = remaining
@@ -214,8 +240,11 @@ class NopeServerError(NopeError):
         code: Optional[str] = None,
         retry_after: Optional[float] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(message, status_code=status_code, code=code, response_body=response_body)
+        super().__init__(
+            message, status_code=status_code, code=code, response_body=response_body, body=body
+        )
         self.retry_after = retry_after
 
 
@@ -233,6 +262,7 @@ class NopeServiceUnavailableError(NopeServerError):
         code: Optional[str] = None,
         retry_after: Optional[float] = None,
         response_body: Optional[str] = None,
+        body: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(
             message,
@@ -240,6 +270,7 @@ class NopeServiceUnavailableError(NopeServerError):
             code=code,
             retry_after=retry_after,
             response_body=response_body,
+            body=body,
         )
 
 

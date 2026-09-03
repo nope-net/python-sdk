@@ -122,12 +122,17 @@ def parse_response_meta(headers: HeaderMapping) -> ResponseMeta:
 # =============================================================================
 
 
-def _decode_body(text: str) -> Dict[str, Any]:
+def _parse_object(text: str) -> Optional[Dict[str, Any]]:
+    """The body as a JSON object, or ``None`` when it is not one (HTML, a bare value)."""
     try:
         parsed = json.loads(text)
     except ValueError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _decode_body(text: str) -> Dict[str, Any]:
+    return _parse_object(text) or {}
 
 
 def _retry_after(headers: httpx.Headers, body: Dict[str, Any]) -> Optional[float]:
@@ -164,7 +169,8 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
     (the caller raises it). Shared by ``NopeClient`` and ``AsyncNopeClient``.
     """
     h = _as_headers(headers)
-    body = _decode_body(text)
+    parsed = _parse_object(text)
+    body = parsed if parsed is not None else {}
 
     error_field = body.get("error")
     error_str = error_field if isinstance(error_field, str) else None
@@ -192,10 +198,11 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
             code=code,
             details=details,
             response_body=text,
+            body=parsed,
         )
 
     if status_code == 401:
-        return NopeAuthError(message, code=code, response_body=text)
+        return NopeAuthError(message, code=code, response_body=text, body=parsed)
 
     if status_code == 402:
         balance = body.get("balance")
@@ -211,6 +218,7 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
             per_conversation_mills=_optional_number(balance.get("per_conversation_mills")),
             conversations=_optional_int(balance.get("conversations")),
             response_body=text,
+            body=parsed,
         )
 
     if status_code == 403:
@@ -224,6 +232,7 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
                 required_access=_optional_str(body.get("required_access")),
                 upgrade_url=upgrade_url,
                 response_body=text,
+                body=parsed,
             )
         if upgrade_url:
             return NopeFeatureError(
@@ -232,11 +241,12 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
                 feature="paid_plan",
                 upgrade_url=upgrade_url,
                 response_body=text,
+                body=parsed,
             )
-        return NopeError(message, status_code=403, code=code, response_body=text)
+        return NopeError(message, status_code=403, code=code, response_body=text, body=parsed)
 
     if status_code == 404:
-        return NopeNotFoundError(message, code=code, response_body=text)
+        return NopeNotFoundError(message, code=code, response_body=text, body=parsed)
 
     if status_code == 429:
         return NopeRateLimitError(
@@ -251,6 +261,7 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
             ),
             reset=_optional_int(body.get("reset")) or _int_header(h, "x-ratelimit-reset"),
             response_body=text,
+            body=parsed,
         )
 
     if status_code == 503:
@@ -259,6 +270,7 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
             code=code,
             retry_after=_retry_after(h, body),
             response_body=text,
+            body=parsed,
         )
 
     if status_code >= 500:
@@ -268,9 +280,10 @@ def build_error(status_code: int, headers: HeaderMapping, text: str) -> NopeErro
             code=code,
             retry_after=_retry_after(h, body),
             response_body=text,
+            body=parsed,
         )
 
-    return NopeError(message, status_code=status_code, code=code, response_body=text)
+    return NopeError(message, status_code=status_code, code=code, response_body=text, body=parsed)
 
 
 # =============================================================================
