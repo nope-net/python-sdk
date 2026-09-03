@@ -1,0 +1,45 @@
+# Live suite against api.nope.net. Manual only: it spends balance on the
+# sdk-e2e account (about $0.13 for the smoke subset, about $1.82 for the full
+# matrix, see SDK_ALIGNMENT_AUDIT.md section 5.1).
+#
+# Setup (once): add the sdk-e2e account's API key as the repository secret
+# NOPE_E2E_API_KEY (Settings > Secrets and variables > Actions). The workflow
+# fails at the key check if it is missing. There is no schedule.
+name: Live API suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: "Run the nightly smoke subset (SMOKE=1) instead of the full matrix"
+        type: boolean
+        default: true
+
+concurrency:
+  group: live-api-suite
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Check the secret is configured
+        env:
+          NOPE_E2E_API_KEY: ${{ secrets.NOPE_E2E_API_KEY }}
+        run: |
+          if [ -z "$NOPE_E2E_API_KEY" ]; then
+            echo "NOPE_E2E_API_KEY is not configured as a repository secret" >&2
+            exit 1
+          fi
+      - name: Run the live suite
+        env:
+          NOPE_LIVE: "1"
+          NOPE_E2E_API_KEY: ${{ secrets.NOPE_E2E_API_KEY }}
+          SMOKE: ${{ inputs.smoke && '1' || '0' }}
+        run: pytest -m live tests/live
