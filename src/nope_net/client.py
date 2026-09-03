@@ -7,7 +7,18 @@ Main client for interacting with the NOPE API.
 import asyncio
 import time
 import warnings
-from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 
 import httpx
 
@@ -176,7 +187,7 @@ class NopeClient:
     def evaluate(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
     ) -> EvaluateResponse:
@@ -189,7 +200,8 @@ class NopeClient:
 
         Args:
             messages: Conversation messages, each ``{"role": "user" | "assistant",
-                "content": str}``.
+                "content": str}`` or a ``Message``. Any sequence (list, tuple) of
+                dicts, mappings or models is accepted and sent as a JSON array.
             text: Plain text input (free-form transcripts or session notes).
             config: ``country`` (ISO 3166-1 alpha-2, default US), ``include_resources``
                 (default true), ``conversation_id`` and ``end_user_id`` (webhook
@@ -239,7 +251,7 @@ class NopeClient:
     def screen(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[ScreenConfig, Dict[str, Any]]] = None,
     ) -> ScreenResponse:
@@ -290,7 +302,7 @@ class NopeClient:
     def ocular(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
         per_turn: Optional[bool] = None,
@@ -375,7 +387,7 @@ class NopeClient:
 
     def oversight_analyze(
         self,
-        conversation: Union[OversightConversation, Dict[str, Any]],
+        conversation: Union[OversightConversation, Mapping[str, Any]],
         *,
         bot_context: Optional[str] = None,
         config: Optional[Union[OversightAnalyzeConfig, Dict[str, Any]]] = None,
@@ -451,7 +463,7 @@ class NopeClient:
     def oversight_ingest(
         self,
         *,
-        conversations: List[Union[OversightConversation, Dict[str, Any]]],
+        conversations: Sequence[Union[OversightConversation, Mapping[str, Any]]],
         webhook_url: Optional[str] = None,
         config: Optional[Union[OversightIngestConfig, Dict[str, Any]]] = None,
     ) -> OversightIngestResponse:
@@ -465,8 +477,10 @@ class NopeClient:
 
         Args:
             conversations: Conversations (at most 300), each with a ``conversation_id``
-                and non-empty ``messages``. The request body is capped at 512 KB, so a
-                batch near the count limit must consist of short conversations.
+                and non-empty ``messages``; any sequence of dicts, mappings or
+                ``OversightConversation`` models. The request body is capped at
+                512 KB, so a batch near the count limit must consist of short
+                conversations.
             webhook_url: Legacy per-request callback. The API POSTs an unsigned
                 ``{event: 'ingestion_complete', timestamp, ingestion_id,
                 conversations_processed, errors_count, high_concern_count}`` here when
@@ -857,7 +871,7 @@ class AsyncNopeClient:
     async def evaluate(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
     ) -> EvaluateResponse:
@@ -875,7 +889,7 @@ class AsyncNopeClient:
     async def screen(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         config: Optional[Union[ScreenConfig, Dict[str, Any]]] = None,
     ) -> ScreenResponse:
@@ -903,7 +917,7 @@ class AsyncNopeClient:
     async def ocular(
         self,
         *,
-        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
+        messages: Optional[Sequence[Union[Message, Mapping[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
         per_turn: Optional[bool] = None,
@@ -935,7 +949,7 @@ class AsyncNopeClient:
 
     async def oversight_analyze(
         self,
-        conversation: Union[OversightConversation, Dict[str, Any]],
+        conversation: Union[OversightConversation, Mapping[str, Any]],
         *,
         bot_context: Optional[str] = None,
         config: Optional[Union[OversightAnalyzeConfig, Dict[str, Any]]] = None,
@@ -961,7 +975,7 @@ class AsyncNopeClient:
     async def oversight_ingest(
         self,
         *,
-        conversations: List[Union[OversightConversation, Dict[str, Any]]],
+        conversations: Sequence[Union[OversightConversation, Mapping[str, Any]]],
         webhook_url: Optional[str] = None,
         config: Optional[Union[OversightIngestConfig, Dict[str, Any]]] = None,
     ) -> OversightIngestResponse:

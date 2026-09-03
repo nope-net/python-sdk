@@ -6,7 +6,8 @@ cannot drift: a method body in ``client.py`` is one builder call plus one
 ``_request`` call.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from collections import abc
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from pydantic import BaseModel
 
@@ -19,6 +20,7 @@ MAX_TRAJECTORY_STRIDE = 64
 MAX_OCULAR_IDENTITY_LENGTH = 256
 
 JsonDict = Dict[str, Any]
+ModelOrMapping = Union[BaseModel, Mapping[str, Any]]
 
 
 def invalid_request(message: str) -> NopeValidationError:
@@ -31,20 +33,20 @@ def not_available_in_demo(message: str) -> NopeValidationError:
     return NopeValidationError(message, status_code=None, code="not_available_in_demo")
 
 
-def dump(value: Union[BaseModel, JsonDict]) -> JsonDict:
-    """Serialise a model or pass a dict through (copied)."""
+def dump(value: ModelOrMapping) -> JsonDict:
+    """Serialise a model, or copy any mapping into a plain dict."""
     if isinstance(value, BaseModel):
         return value.model_dump(exclude_none=True)
     return dict(value)
 
 
 def normalize_messages(
-    messages: Sequence[Union[BaseModel, JsonDict]],
+    messages: Sequence[ModelOrMapping],
     *,
     allowed_roles: Tuple[str, ...],
     max_messages: Optional[int],
 ) -> List[JsonDict]:
-    """Validate and serialise a message list."""
+    """Validate and serialise a message sequence (list, tuple, ...) into a list."""
     if len(messages) == 0:
         raise invalid_request("'messages' cannot be empty")
     if max_messages is not None and len(messages) > max_messages:
@@ -65,7 +67,7 @@ def normalize_messages(
 
 
 def _messages_or_text(
-    messages: Optional[Sequence[Union[BaseModel, JsonDict]]],
+    messages: Optional[Sequence[ModelOrMapping]],
     text: Optional[str],
     *,
     allowed_roles: Tuple[str, ...],
@@ -92,9 +94,9 @@ def _messages_or_text(
 
 def build_evaluate_request(
     *,
-    messages: Optional[Sequence[Union[BaseModel, JsonDict]]],
+    messages: Optional[Sequence[ModelOrMapping]],
     text: Optional[str],
-    config: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
     demo: bool,
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for ``evaluate``.
@@ -115,9 +117,9 @@ def build_evaluate_request(
 
 def build_screen_request(
     *,
-    messages: Optional[Sequence[Union[BaseModel, JsonDict]]],
+    messages: Optional[Sequence[ModelOrMapping]],
     text: Optional[str],
-    config: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for the legacy ``screen`` call."""
     payload = _messages_or_text(
@@ -133,6 +135,27 @@ def build_screen_request(
 # =============================================================================
 
 
+def _is_message_sequence(value: Any) -> bool:
+    """A list, tuple or other sequence of messages; strings do not count."""
+    return isinstance(value, abc.Sequence) and not isinstance(value, (str, bytes))
+
+
+def _listify_messages(conversation: JsonDict) -> None:
+    """Rewrite ``conversation["messages"]`` in place as a list of plain dicts.
+
+    Models are dumped and mappings copied; anything else is left for the role
+    check (or the API) to reject. ``conversation`` is already the caller's own
+    copy from :func:`dump`.
+    """
+    messages = conversation.get("messages")
+    if messages is None or not _is_message_sequence(messages):
+        return
+    conversation["messages"] = [
+        dump(message) if isinstance(message, (BaseModel, abc.Mapping)) else message
+        for message in messages
+    ]
+
+
 def _validate_oversight_conversation(
     conversation: JsonDict, *, index: Optional[int] = None
 ) -> None:
@@ -140,11 +163,12 @@ def _validate_oversight_conversation(
     messages = conversation.get("messages")
     if messages is None:
         raise invalid_request(f'"{label}.messages" is required')
-    if not isinstance(messages, list):
+    if not _is_message_sequence(messages):
         raise invalid_request(f'"{label}.messages" must be a list')
     if len(messages) == 0:
         raise invalid_request(f'"{label}.messages" cannot be empty')
-    for position, message in enumerate(messages):
+    _listify_messages(conversation)
+    for position, message in enumerate(conversation["messages"]):
         role = message.get("role") if isinstance(message, dict) else None
         if role not in ("user", "assistant", "system"):
             raise invalid_request(
@@ -164,10 +188,10 @@ def _validate_behavior_filter(behaviors: JsonDict) -> None:
 
 def build_oversight_analyze_request(
     *,
-    conversation: Union[BaseModel, JsonDict],
+    conversation: ModelOrMapping,
     bot_context: Optional[str],
-    config: Optional[Union[BaseModel, JsonDict]],
-    behaviors: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
+    behaviors: Optional[ModelOrMapping],
     demo: bool,
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for ``oversight_analyze``."""
@@ -188,9 +212,9 @@ def build_oversight_analyze_request(
 
 def build_oversight_ingest_request(
     *,
-    conversations: Sequence[Union[BaseModel, JsonDict]],
+    conversations: Sequence[ModelOrMapping],
     webhook_url: Optional[str],
-    config: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
 ) -> Tuple[str, JsonDict]:
     """Return ``(path, body)`` for ``oversight_ingest`` (client cap 300 conversations)."""
     if not conversations:
@@ -209,6 +233,7 @@ def build_oversight_ingest_request(
             raise invalid_request(
                 f'Conversation "{data["conversation_id"]}" must have non-empty "messages"'
             )
+        _listify_messages(data)
         conversation_list.append(data)
     payload: JsonDict = {"conversations": conversation_list}
     if webhook_url is not None:
@@ -225,7 +250,7 @@ def build_oversight_ingest_request(
 
 def build_ocular_request(
     *,
-    messages: Optional[Sequence[Union[BaseModel, JsonDict]]],
+    messages: Optional[Sequence[ModelOrMapping]],
     text: Optional[str],
     thoroughness: Optional[str],
     per_turn: Optional[bool],
@@ -279,7 +304,7 @@ def _join(values: Optional[Sequence[str]]) -> Optional[str]:
 def build_signpost_params(
     *,
     country: str,
-    config: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
     scopes: Optional[Sequence[str]],
     populations: Optional[Sequence[str]],
     subdivisions: Optional[Sequence[str]],
@@ -311,7 +336,7 @@ def build_signpost_smart_params(
     *,
     country: str,
     query: str,
-    config: Optional[Union[BaseModel, JsonDict]],
+    config: Optional[ModelOrMapping],
 ) -> Dict[str, str]:
     """Query params for the smart (LLM-ranked) lookup."""
     if not query:

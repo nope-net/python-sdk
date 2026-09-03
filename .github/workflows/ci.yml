@@ -24,7 +24,7 @@ jobs:
           ruff check src tests scripts
           ruff format --check src tests scripts
       - name: Type check
-        run: mypy src
+        run: mypy src tests/typing
       - name: Unit and contract tests
         run: pytest
       - name: Build

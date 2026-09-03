@@ -14,7 +14,7 @@ format:
 	ruff check --fix src tests scripts
 
 typecheck:
-	mypy src
+	mypy src tests/typing
 
 # Unit + contract tests; the live suite is excluded by pyproject addopts.
 test:
