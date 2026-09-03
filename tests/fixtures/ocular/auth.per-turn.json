@@ -1,0 +1,142 @@
+{
+  "salience": 0.3721,
+  "subject": "self",
+  "imminence": {
+    "level": "minimal",
+    "score": 0.0001
+  },
+  "fiction": 0,
+  "authenticity": 0.964,
+  "signals": {
+    "user": {
+      "suicide": {
+        "level": "high",
+        "score": 0.3549
+      },
+      "self_harm": {
+        "level": "minimal",
+        "score": 0
+      },
+      "harm_to_others": {
+        "level": "minimal",
+        "score": 0
+      },
+      "abuse": {
+        "level": "minimal",
+        "score": 0
+      },
+      "sexual_violence": {
+        "level": "minimal",
+        "score": 0
+      },
+      "exploitation": {
+        "level": "minimal",
+        "score": 0
+      },
+      "stalking": {
+        "level": "minimal",
+        "score": 0
+      },
+      "self_neglect": {
+        "level": "minimal",
+        "score": 0
+      }
+    },
+    "ai": {
+      "harm_provision": {
+        "level": "minimal",
+        "score": 0
+      },
+      "emotional_failure": {
+        "level": "minimal",
+        "score": 0.0111
+      },
+      "manipulation": {
+        "level": "minimal",
+        "score": 0
+      },
+      "safeguarding_failure": {
+        "level": "minimal",
+        "score": 0
+      }
+    }
+  },
+  "thoroughness": "auto",
+  "confidence": 0.9998,
+  "stability": {
+    "user": {
+      "suicide": 0.9987,
+      "self_harm": 1,
+      "harm_to_others": 1,
+      "abuse": 1,
+      "sexual_violence": 1,
+      "exploitation": 1,
+      "stalking": 1,
+      "self_neglect": 1
+    },
+    "ai": {
+      "harm_provision": 1,
+      "emotional_failure": 0.9351,
+      "manipulation": 1,
+      "safeguarding_failure": 1
+    },
+    "imminence": 1
+  },
+  "meta": {
+    "version": "0.3.11",
+    "inference_ms": 50,
+    "windowed": false,
+    "windows": 1
+  },
+  "trajectory": [
+    {
+      "role": "user",
+      "turn": 0,
+      "salience": 0,
+      "signals_by_axis": {
+        "suicide": 0.0006,
+        "self_harm": 0,
+        "harm_to_others": 0,
+        "abuse": 0.0002,
+        "ai_harm_provision": 0,
+        "ai_emotional_failure": 0,
+        "ai_manipulation": 0,
+        "ai_safeguarding_failure": 0,
+        "genuine": 0,
+        "fiction": 0
+      }
+    },
+    {
+      "role": "assistant",
+      "turn": 3,
+      "salience": 0.3715,
+      "signals_by_axis": {
+        "suicide": 1,
+        "self_harm": 0,
+        "harm_to_others": 0,
+        "abuse": 0,
+        "ai_harm_provision": 0,
+        "ai_emotional_failure": 0.0164,
+        "ai_manipulation": 0,
+        "ai_safeguarding_failure": 0,
+        "genuine": 0.0217,
+        "fiction": 0
+      }
+    }
+  ],
+  "trajectory_shape": {
+    "onsets": {
+      "suicide": 3
+    },
+    "phases": [
+      "baseline",
+      "crisis"
+    ],
+    "slopes": [
+      0,
+      0.999
+    ],
+    "peak_turn": 1,
+    "peak_crisis": 1
+  }
+}

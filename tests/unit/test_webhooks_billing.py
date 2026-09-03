@@ -239,10 +239,10 @@ class TestBillingNamespace:
         assert result.balance_mills == 12345.6
         assert result.balance_formatted == "$12.35"
         assert result.estimated_evaluates == 4115
-        assert result.estimated_screens is None
+        assert result.estimated_screens == 12345
         assert result.low_balance is False
         assert result.topup_options[0].amount_mills == 10000
-        assert result.topup_options[0].screens is None
+        assert result.topup_options[0].screens == 10000
 
     async def test_usage_with_dates(self, api: FakeApi, make: ClientFactory) -> None:
         body = load_fixture("billing/usage.json")
@@ -330,8 +330,9 @@ class TestBillingNamespace:
         assert isinstance(result, BillingPricingResponse)
         assert result.unit == "mills"
         assert result.pricing["evaluate"].cost_mills == 3
-        assert result.pricing["screen"].cost_mills is None
-        assert result.pricing["resources"].cost_display == "Free"
+        assert result.pricing["screen"].cost_mills == 1
+        assert result.pricing["oversight_ingest"].cost_display == "$0.10"
+        assert "resources" not in result.pricing
         assert result.free_credit_mills == 1000
 
     async def test_topup(self, api: FakeApi, make: ClientFactory) -> None:

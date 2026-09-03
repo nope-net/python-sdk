@@ -1,0 +1,49 @@
+{
+  "resource": {
+    "id": "bcad260c-f31a-413a-bf89-b717df824680",
+    "type": "crisis_line",
+    "name": "Samaritans",
+    "phone": "116 123",
+    "email": "jo@samaritans.org",
+    "website_url": "https://www.samaritans.org/",
+    "availability": "24/7",
+    "is_24_7": true,
+    "timezone": "Europe/London",
+    "opening_hours_osm": "24/7",
+    "hours_confidence": "verified",
+    "open_status": {
+      "is_open": true,
+      "confidence": "high",
+      "message": "Open 24/7"
+    },
+    "languages": [
+      "en",
+      "cy"
+    ],
+    "description": "Samaritans offers a safe space for anyone to talk any time they like, in their own way – about whatever's getting to them. Trained volunteers listen and won't judge or tell you what to do.",
+    "resource_kind": "helpline",
+    "service_scope": [
+      "crisis",
+      "suicide",
+      "self_harm",
+      "mental_health",
+      "emotional_distress",
+      "loneliness"
+    ],
+    "population_served": [
+      "general"
+    ],
+    "priority_tier": "primary_national_crisis",
+    "tags": [
+      "ngo",
+      "peer_support",
+      "anonymous",
+      "confidential",
+      "toll_free"
+    ],
+    "prominence": "high",
+    "country_codes": [
+      "GB"
+    ]
+  }
+}

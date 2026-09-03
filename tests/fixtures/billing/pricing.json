@@ -2,29 +2,50 @@
   "unit": "mills",
   "unit_description": "1 mill = $0.001 (one-tenth of a cent)",
   "pricing": {
+    "ocular": {
+      "cost_mills": 0.1,
+      "cost_display": "$0.0001",
+      "description": "Behavioral risk assessment (POST /v1/ocular)"
+    },
     "resources_smart": {
       "cost_mills": 1,
       "cost_display": "$0.001",
-      "description": "AI-ranked crisis resources search"
+      "description": "AI-ranked crisis resources (GET /v1/resources/smart, deprecated alias of signpost_smart)"
     },
-    "screen": {
+    "signpost_smart": {
+      "cost_mills": 1,
       "cost_display": "$0.001",
-      "description": "Crisis signal screening"
+      "description": "AI-ranked crisis resources (GET /v1/signpost/smart)"
+    },
+    "v0_screen": {
+      "cost_mills": 1,
+      "cost_display": "$0.001",
+      "description": "Legacy crisis screening (POST /v0/screen)"
     },
     "evaluate": {
       "cost_mills": 3,
-      "cost_display": "$0.10",
-      "description": "Full multi-domain risk assessment"
+      "cost_display": "$0.003",
+      "description": "Edge-backed safety assessment (POST /v1/evaluate)"
     },
-    "safe": {
+    "v0_evaluate": {
       "cost_mills": 50,
-      "cost_display": "$0.10",
-      "description": "Safety-aware LLM proxy"
+      "cost_display": "$0.05",
+      "description": "Legacy two-stage risk evaluation (POST /v0/evaluate)"
     },
-    "resources": {
-      "cost_mills": 0,
-      "cost_display": "Free",
-      "description": "Basic crisis resources lookup (requires API key)"
+    "oversight_analyze": {
+      "cost_mills": 100,
+      "cost_display": "$0.10",
+      "description": "Single-conversation AI behavior analysis (POST /v1/oversight/analyze)"
+    },
+    "oversight_ingest": {
+      "cost_mills": 100,
+      "cost_display": "$0.10",
+      "description": "Batch AI behavior analysis, charged per conversation (POST /v1/oversight/ingest)"
+    },
+    "screen": {
+      "cost_mills": 1,
+      "cost_display": "$0.001",
+      "description": "Legacy crisis screening (POST /v0/screen)"
     }
   },
   "topup_options": [
@@ -32,6 +53,7 @@
       "id": "topup_10",
       "amount_mills": 10000,
       "label": "$10",
+      "screens": 10000,
       "evaluates": 3333,
       "resources_smart": 10000
     },
@@ -39,6 +61,7 @@
       "id": "topup_25",
       "amount_mills": 25000,
       "label": "$25",
+      "screens": 25000,
       "evaluates": 8333,
       "resources_smart": 25000
     },
@@ -46,6 +69,7 @@
       "id": "topup_50",
       "amount_mills": 50000,
       "label": "$50",
+      "screens": 50000,
       "evaluates": 16666,
       "resources_smart": 50000
     },
@@ -53,6 +77,7 @@
       "id": "topup_100",
       "amount_mills": 100000,
       "label": "$100",
+      "screens": 100000,
       "evaluates": 33333,
       "resources_smart": 100000
     }

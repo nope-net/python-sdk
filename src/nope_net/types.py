@@ -1593,8 +1593,8 @@ class BillingTopupOption(BaseModel):
     label: str
     evaluates: int
     resources_smart: int
-    screens: Optional[int] = None
-    """Absent from the wire until API fix A-5 is deployed."""
+    screens: int
+    """Screens this amount buys."""
 
 
 class BillingBalanceResponse(BaseModel):
@@ -1606,8 +1606,8 @@ class BillingBalanceResponse(BaseModel):
     balance_formatted: str
     estimated_evaluates: int
     estimated_resources_smart: int
-    estimated_screens: Optional[int] = None
-    """Absent from the wire until API fix A-5 is deployed."""
+    estimated_screens: int
+    """Screens the balance covers."""
     low_balance: bool
     topup_history: List[BillingTopupHistoryEntry]
     topup_options: List[BillingTopupOption]
@@ -1666,8 +1666,7 @@ class BillingPricingEntry(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    cost_mills: Optional[float] = None
-    """Absent for the ``screen`` entry until API fix A-5 is deployed."""
+    cost_mills: float
     cost_display: str
     description: Optional[str] = None
 

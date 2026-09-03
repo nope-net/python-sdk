@@ -13,10 +13,12 @@ the sanitization rules below.
 | `evaluate/` | `auth.benign.json` | `POST /v1/evaluate`, one benign message, `risks: []` |
 | | `try.gb.json` | `POST /v1/try/evaluate`, three messages, GB resources, `subdivision_codes`, `metadata.model` |
 | | `try.us.json` | `POST /v1/try/evaluate`, one message; requested with `config.country: GB` before the demo route honoured it, so the resources are US |
+| | `try.gb.no-resources.json` | `POST /v1/try/evaluate` after API fix A-1: `config.country: GB`, `include_resources: false`, no resources returned |
+| | `try.gb.text.json` | `POST /v1/try/evaluate` with `text`, `metadata.input_format: text_blob` |
 | `oversight/` | `try.full.json`, `try.fast.json`, `auth.fast.json` | the demo full, demo fast and authenticated fast envelopes |
-| `ocular/` | `try.json`, `auth.json` | demo wire (with `heads`, `detail`) and customer wire, `meta.version` 0.3.11 |
-| `signpost/` | `auth.gb.json`, `try.smart.json`, `search.auth.json`, `search.auth.mixed-contacts.json`, `countries.json`, `detect-country.miss.json` | basic (authenticated), demo smart, search (authenticated; the mixed-contacts capture from the first live run shows contacts without `tier` or `value` and chat contacts carrying `url`), countries, detect-country miss |
-| `billing/` | `balance.json`, `usage.json`, `pricing.json` | `GET /v1/billing/*` (balance and usage figures replaced) |
+| `ocular/` | `try.json`, `auth.json`, `auth.per-turn.json` | demo wire (with `heads`, `detail`), customer wire, and the customer wire with `per_turn: true` (`trajectory`, `trajectory_shape`, roles `user`/`assistant`) |
+| `signpost/` | `auth.gb.json`, `try.smart.json`, `search.auth.json`, `search.auth.mixed-contacts.json`, `countries.json`, `detect-country.miss.json`, `by-id.json` | basic (authenticated; resources carry `id` after API fix A-6), demo smart, by-id, search (authenticated; the mixed-contacts capture from the first live run shows contacts without `tier` or `value` and chat contacts carrying `url`), countries, detect-country miss |
+| `billing/` | `balance.json`, `usage.json`, `pricing.json` | `GET /v1/billing/*` after API fix A-5 (balance and usage figures replaced) |
 | `errors/` | `400.*.json`, `401.*.json`, `404.*.json`, `413.*.json` | error bodies as served; 402, 429 and 503 are source-derived and live in the tests |
 | `headers/` | `*.txt` | rate-limit and balance headers (balance values replaced) |
 | `webhooks/` | `*.json` | payloads built by the API's own builders and signed with a fixed test secret |

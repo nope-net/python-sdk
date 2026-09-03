@@ -1,9 +1,7 @@
 """Live matrix (SDK_ALIGNMENT_AUDIT.md section 5.3, Python rows) against api.nope.net.
 
 Opt in with ``NOPE_LIVE=1 pytest -m live``. Every row runs for NopeClient and
-AsyncNopeClient. Rows whose assertion depends on an API fix not yet deployed
-assert the shape and skip the behavioural check with "pending API deploy of A-n".
-Rows that spend 100 mills per call are excluded from ``SMOKE=1`` except row 12,
+AsyncNopeClient. Rows that spend 100 mills per call are excluded from ``SMOKE=1`` except row 12,
 which rotates one client per weekday.
 """
 
@@ -122,10 +120,15 @@ async def test_row03_evaluate_demo(demo: ClientRunner, ledger: CostLedger) -> No
 
     assert result.metadata is not None and result.metadata.try_endpoint is True
     assert result.metadata.model
-    if result.resources is not None:
-        codes = result.resources.primary.country_codes or []
-        if "GB" not in codes:
-            pytest.skip("pending API deploy of A-1 (demo route reads config.country)")
+    assert result.resources is not None, "demo evaluate returns resources by default"
+    assert "GB" in (result.resources.primary.country_codes or [])
+
+    ledger.take_demo_evaluate()
+    without = await demo.call(
+        "evaluate", messages=CONCERNING, config={"country": "GB", "include_resources": False}
+    )
+    await _done(demo, ledger)
+    assert without.show_resources is False and without.resources is None
 
 
 async def test_row04_bad_key(client_kind: str, base_url: str) -> None:
@@ -220,8 +223,7 @@ async def test_row09_ocular_per_turn(
     if result.trajectory_shape is not None and result.trajectory_shape.phases:
         assert set(result.trajectory_shape.phases) <= PHASES
     roles = {entry.role for entry in result.trajectory}
-    if not roles <= {"user", "assistant"}:
-        pytest.skip("pending API deploy of A-4 (trajectory role normalised to assistant)")
+    assert roles <= {"user", "assistant"}, roles
 
 
 async def test_row10_ocular_demo(demo: ClientRunner, ledger: CostLedger) -> None:
@@ -489,9 +491,12 @@ async def test_row27_billing_and_webhook_management(
     webhooks = await authed.call("webhooks.list")
 
     assert balance.balance_mills >= 0 and balance.topup_options
+    assert isinstance(balance.estimated_screens, int)
+    assert all(isinstance(o.screens, int) for o in balance.topup_options)
     assert usage.period_start and isinstance(usage.breakdown, list)
     assert history.limit == 5 and history.total >= 0
-    assert "evaluate" in pricing.pricing
+    assert "evaluate" in pricing.pricing and "ocular" in pricing.pricing
+    assert pricing.pricing["screen"].cost_mills == pricing.pricing["v0_screen"].cost_mills
     assert isinstance(webhooks.webhooks, list)
 
     try:
@@ -509,9 +514,6 @@ async def test_row27_billing_and_webhook_management(
         deleted = await authed.call("webhooks.delete", created.id)
         await _done(authed, ledger)
     assert deleted.success is True
-
-    if balance.estimated_screens is None or "ocular" not in pricing.pricing:
-        pytest.skip("pending API deploy of A-5 (balance.estimated_screens, full pricing table)")
 
 
 # ---------------------------------------------------------------------------

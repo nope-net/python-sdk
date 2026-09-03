@@ -1,0 +1,26 @@
+{
+  "risks": [
+    {
+      "type": "suicide",
+      "subject": "other",
+      "severity": "mild",
+      "imminence": "chronic",
+      "features": [
+        "hopelessness"
+      ]
+    }
+  ],
+  "rationale": "The user is reporting a patient's expression of hopelessness in a clinical context. This indicates a potential risk for the patient, but the user themselves is not at risk. The communication style is clinical and detached, as expected from a professional reporting on a patient.",
+  "speaker_severity": "none",
+  "speaker_imminence": "not_applicable",
+  "show_resources": false,
+  "request_id": "eval_1788396900000_fixture",
+  "timestamp": "2026-09-03T00:55:00.000Z",
+  "metadata": {
+    "api_version": "v1",
+    "input_format": "text_blob",
+    "try_endpoint": true,
+    "messages_truncated": false,
+    "model": "nope-edge:minime-v14f"
+  }
+}
