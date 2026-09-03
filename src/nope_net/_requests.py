@@ -60,7 +60,7 @@ def _messages_or_text(
     if messages is None and text is None:
         raise ValueError("Either 'messages' or 'text' must be provided")
     if messages is not None and text is not None:
-        raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
+        raise ValueError("Only one of 'messages' or 'text' can be provided")
     payload: JsonDict = {}
     if messages is not None:
         payload["messages"] = normalize_messages(

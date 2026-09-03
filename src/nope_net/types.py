@@ -1381,7 +1381,7 @@ class OcularResponse(BaseModel):
     """Who the speaker-side risk pertains to: 'self' / 'other' / 'unknown'."""
 
     imminence: OcularAxis
-    """How urgent the concern is (separate axis, not part of ``signals``)."""
+    """How urgent the concern is (its own axis, outside ``signals``)."""
 
     fiction: float
     """Roleplay/fiction-framing strength in [0, 1] (informational)."""
@@ -1447,7 +1447,7 @@ class OcularDemoResponse(OcularResponse):
 
 
 class SignpostSearchContact(BaseModel):
-    """One contact method on a search row (the directory row, not flattened)."""
+    """One contact method on a search row, as the directory stores it."""
 
     model_config = {"extra": "allow"}
 
