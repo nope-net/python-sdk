@@ -1,0 +1,622 @@
+{
+  "query": "lgbtq youth support",
+  "country": "GB",
+  "results": [
+    {
+      "id": "80dcd17e-504a-48f3-b28b-40d204eec38d",
+      "name": "LGBT Foundation",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "mental_health",
+        "sexual_health",
+        "domestic_violence"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "National charity with LGBTQ+ health and wellbeing at the heart of everything they do. Delivers advice, support, and information services including sexual health advice, domestic abuse support, and training on health inequalities. Helpline provides friendly, non-judgemental brief interventions, advice, emotional support, and signposting. Online resources for mental health and wellbeing.",
+      "resource_type": "support_service",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0345 3 30 30 30",
+          "source": "https://lgbt.foundation/help/helpline-email-support/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "helpline@lgbt.foundation",
+          "source": "https://lgbt.foundation/help/helpline-email-support/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://lgbt.foundation",
+      "is_24_7": false,
+      "availability": "Monday-Friday 10am-6pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Fr 00:00-18:00",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.5604295256106,
+      "phone": "0345 3 30 30 30",
+      "email": "helpline@lgbt.foundation",
+      "type": "support_service",
+      "open_status": {
+        "is_open": true,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Open until 6:00 PM"
+      }
+    },
+    {
+      "id": "483dfc4c-fd3e-49bf-b53e-6751b3743b6f",
+      "name": "Brighton & Hove LGBT Switchboard",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "hate_crime",
+        "sexual_health"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "Supports LGBTQ+ people across the UK via helpline, email, and webchat. Confidential and anonymous listening service for issues including coming out, emotional difficulties, relationships, gender and sexual identity exploration, hate crime, and sexual health. All volunteers identify as LGBTQ+ and never end calls until caller is ready.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "01273 204050",
+          "source": "https://www.switchboard.org.uk/what-we-do/helpline/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "helpline@switchboard.org.uk",
+          "source": "https://www.switchboard.org.uk/what-we-do/helpline/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://www.switchboard.org.uk/",
+      "is_24_7": false,
+      "availability": "Tuesday-Thursday 7pm-9:30pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Tu-Th 19:00-21:30",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.548211105930815,
+      "phone": "01273 204050",
+      "email": "helpline@switchboard.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Closed · Opens in 14 hours"
+      }
+    },
+    {
+      "id": "93321fa2-ba4b-469b-ade4-c7d997d8113e",
+      "name": "Switchboard LGBT+",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "mental_health",
+        "sexual_health",
+        "relationships"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "National LGBTQIA+ support line for anyone, anywhere in the UK, at any point in their journey. Safe, non-judgemental space to discuss anything related to sexuality and gender identity, including sexual health, relationships, coming out, and general wellbeing. Offers phone, instant messaging, and email support. Empowers individuals to make their own decisions.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0300 330 0630",
+          "source": "https://switchboard.lgbt/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "hello@switchboard.lgbt",
+          "source": "https://switchboard.lgbt/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "chat",
+          "label": "Instant messaging",
+          "value": "https://switchboard.lgbt/get-support",
+          "source": "https://switchboard.lgbt/get-support",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://switchboard.lgbt/",
+      "is_24_7": false,
+      "availability": "10am-10pm every day",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Su 10:00-22:00",
+      "hours_confidence": "verified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.537613740510078,
+      "phone": "0300 330 0630",
+      "chat_url": "https://switchboard.lgbt/get-support",
+      "email": "hello@switchboard.lgbt",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens in 5 hours"
+      }
+    },
+    {
+      "id": "e551f4fd-77a8-43b1-827f-0a710e05eb4a",
+      "name": "Mermaids Support Line",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "transgender",
+        "lgbtq",
+        "mental_health"
+      ],
+      "populations": [
+        "youth",
+        "transgender",
+        "parents",
+        "family"
+      ],
+      "description": "Provides phone, web chat, and email support to trans, non-binary, gender diverse, and gender questioning young people under 20, their loved ones, and allies. Safe, non-judgmental space to discuss thoughts, feelings, and experiences.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0808 801 0400",
+          "source": "https://mermaidsuk.org.uk/support-line/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "chat",
+          "value": "https://mermaidsuk.org.uk/support-line/",
+          "source": "https://mermaidsuk.org.uk/support-line/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://mermaidsuk.org.uk/",
+      "is_24_7": false,
+      "availability": "Monday-Friday 1pm-8:30pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Fr 13:00-20:30",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.528688837769243,
+      "phone": "0808 801 0400",
+      "chat_url": "https://mermaidsuk.org.uk/support-line/",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Closed · Opens in 8 hours"
+      }
+    },
+    {
+      "id": "c5063bf6-0ae6-4b5c-977d-e18996a243e2",
+      "name": "Galop National LGBT+ Helpline",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "domestic_violence",
+        "sexual_assault",
+        "hate_crime",
+        "lgbtq",
+        "conversion_therapy_survivor",
+        "forced_marriage"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "UK's LGBT+ anti-abuse charity helpline for victims and survivors of domestic abuse, sexual violence, hate crime, conversion therapy, honour-based abuse, and forced marriage. Free support for LGBT+ people and those concerned about them.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "type": "phone",
+          "label": "Helpline",
+          "value": "0800 999 5428"
+        },
+        {
+          "type": "email",
+          "value": "help@galop.org.uk"
+        },
+        {
+          "url": "https://www.galop.org.uk/helpline",
+          "type": "chat"
+        }
+      ],
+      "website_url": "https://www.galop.org.uk/",
+      "is_24_7": false,
+      "availability": "Mon-Tue 9:15am-8pm, Wed-Fri 9:15am-4:30pm (closed 1-2pm)",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Tu 09:15-13:00,14:00-20:00; We-Fr 09:15-13:00,14:00-16:30",
+      "hours_confidence": "verified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.523903190408464,
+      "phone": "0800 999 5428",
+      "chat_url": "https://www.galop.org.uk/helpline",
+      "email": "help@galop.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens in 4 hours"
+      }
+    },
+    {
+      "id": "d46c210b-b419-413b-a351-95cebbe7f16c",
+      "name": "Switchboard LGBT+ Helpline",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "mental_health"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "Free LGBT+ helpline offering information, support and referral for lesbians, gay men, bisexual and trans people - and anyone considering issues around their sexuality and/or gender identity.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0300 330 0630",
+          "source": "https://switchboard.lgbt/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://switchboard.lgbt/",
+      "is_24_7": false,
+      "availability": "10am-10pm daily",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Su 10:00-22:00",
+      "hours_confidence": "verified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.513129025533359,
+      "phone": "0300 330 0630",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens in 5 hours"
+      }
+    },
+    {
+      "id": "aef64294-1e00-4ba0-9be2-e27ae1bb4ae0",
+      "name": "Galop",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "domestic_violence",
+        "sexual_assault",
+        "hate_crime",
+        "conversion_therapy_survivor",
+        "forced_marriage"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "UK's LGBT+ anti-abuse charity with decades of experience supporting LGBT+ victims of domestic abuse, sexual violence, hate crime, conversion therapies, honour-based abuse, and forced marriage. National helpline offers free, confidential emotional support, guidance, and help exploring options for anyone aged 18+ experiencing abuse. Open to LGBT+ people, friends, family, and professionals.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0800 999 5428",
+          "source": "https://www.galop.org.uk/helpline",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "help@galop.org.uk",
+          "source": "https://www.galop.org.uk/helpline",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "chat",
+          "value": "https://www.galop.org.uk/get-help/",
+          "source": "https://www.galop.org.uk/get-help/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://www.galop.org.uk/",
+      "is_24_7": false,
+      "availability": "Mon-Tue 9:15am-8pm, Wed-Fri 9:15am-4:30pm (closed 1pm-2pm daily, early close 3:30pm first Thu of month)",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Tu 09:15-13:00,14:00-20:00; We-Fr 09:15-13:00,14:00-16:30",
+      "hours_confidence": "verified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.508237554315873,
+      "phone": "0800 999 5428",
+      "chat_url": "https://www.galop.org.uk/get-help/",
+      "email": "help@galop.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens in 4 hours"
+      }
+    },
+    {
+      "id": "017bcd35-3f06-42fb-bbd9-e4053be0d367",
+      "name": "MindOut LGBTQ Mental Health Service",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "mental_health",
+        "crisis",
+        "anxiety",
+        "depression"
+      ],
+      "populations": [
+        "lgbtq"
+      ],
+      "description": "Mental health service run by and for LGBTQ people. Provides advice, advocacy, peer support groups, befriending, counselling, and online chat support. Based in Brighton but serves nationwide.",
+      "resource_type": "chat_service",
+      "contacts": [
+        {
+          "type": "phone",
+          "label": "Office",
+          "value": "01273 234839"
+        },
+        {
+          "type": "phone",
+          "label": "24hr Answerphone",
+          "value": "0300 7729855"
+        },
+        {
+          "url": "https://mindout.org.uk/get-support/online-chat/",
+          "type": "chat"
+        }
+      ],
+      "website_url": "https://mindout.org.uk/",
+      "is_24_7": false,
+      "availability": "Online chat: most evenings 5:30-7:30pm, Sun 2-4pm; Phone support: Mon-Wed 3-5pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-We 15:00-17:00",
+      "hours_confidence": "verified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.504031210949387,
+      "phone": "0300 7729855",
+      "chat_url": "https://mindout.org.uk/get-support/online-chat/",
+      "type": "chat_service",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens Monday at 2:00 PM"
+      }
+    },
+    {
+      "id": "7af58fb2-2a97-4c89-a0ea-8f46416dab59",
+      "name": "LGBT+ Helpline Scotland",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": "GB-SCT",
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [
+        "GB-SCT"
+      ],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "conversion_therapy_survivor"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "Free helpline for all LGBT+ people across Scotland, including partners, family, friends, and carers. Provides support for those who have experienced or may experience conversion practices. Trained staff offer confidential support, listening, and advice. Multilingual support available by arrangement. Funded by Scottish Government.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0800 464 7000",
+          "source": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "helpline@lgbthealth.org.uk",
+          "source": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "chat",
+          "label": "Live chat when available",
+          "value": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+          "source": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+      "is_24_7": false,
+      "availability": "Tuesday-Thursday 12pm-9pm, Sunday 1pm-6pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Tu-Th 12:00-21:00; Su 13:00-18:00",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.495831250051708,
+      "phone": "0800 464 7000",
+      "chat_url": "https://www.lgbthealth.org.uk/services-support/lgbt-helpline-scotland/",
+      "email": "helpline@lgbthealth.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Closed · Opens in 7 hours"
+      }
+    },
+    {
+      "id": "a9fe0fbd-bb78-4637-a58a-695e2564c348",
+      "name": "Galop's National Conversion Therapy Helpline",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "conversion_therapy_survivor",
+        "lgbtq",
+        "transgender"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "Dedicated free, confidential helpline run by Galop for people who have experienced, are experiencing, or are at risk of experiencing so-called 'conversion therapy' aimed at changing, altering, or 'curing' their sexual orientation or gender identity. Experienced LGBTQ+ staff provide support, information on rights and options, police navigation assistance, safety advice, and referrals to specialist services. Conversations last up to 40 minutes.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0800 130 3335",
+          "source": "https://www.conversiontherapysupport.org.uk/get-help/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "CThelp@galop.org.uk",
+          "source": "https://www.conversiontherapysupport.org.uk/get-help/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "chat",
+          "value": "https://www.conversiontherapysupport.org.uk/get-help/",
+          "source": "https://www.conversiontherapysupport.org.uk/get-help/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://www.conversiontherapysupport.org.uk/",
+      "is_24_7": false,
+      "availability": "Monday-Tuesday 9:15am-8pm, Wednesday-Friday 9:15am-4:30pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Tu 09:15-20:00; We-Fr 09:15-16:30",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.47284184957348,
+      "phone": "0800 130 3335",
+      "chat_url": "https://www.conversiontherapysupport.org.uk/get-help/",
+      "email": "CThelp@galop.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Closed · Opens in 4 hours"
+      }
+    }
+  ],
+  "count": 10,
+  "timing": {
+    "embed_ms": 120,
+    "search_ms": 30,
+    "total_ms": 150
+  }
+}

@@ -35,6 +35,7 @@ FIXTURE_MODELS: Dict[str, str] = {
     "signpost/countries.json": "SignpostCountriesResponse",
     "signpost/detect-country.miss.json": "DetectCountryResponse",
     "signpost/search.auth.json": "SignpostSearchResponse",
+    "signpost/search.auth.mixed-contacts.json": "SignpostSearchResponse",
     "signpost/try.smart.json": "SignpostSmartResponse",
     "billing/balance.json": "BillingBalanceResponse",
     "billing/pricing.json": "BillingPricingResponse",

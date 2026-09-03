@@ -1447,18 +1447,30 @@ class OcularDemoResponse(OcularResponse):
 
 
 class SignpostSearchContact(BaseModel):
-    """One contact method on a search row, as the directory stores it."""
+    """One contact method on a search row, as the directory stores it.
+
+    Only ``type`` is always present. The live wire mixes ``{type, value}``,
+    ``{type, url}`` (chat contacts), ``{label, type, value}`` and tiered rows
+    with ``source`` and ``confidence`` (fixture
+    ``signpost/search.auth.mixed-contacts.json``).
+    """
 
     model_config = {"extra": "allow"}
-
-    tier: Union[int, str]
-    """Contact tier; the directory stores it as a string today."""
 
     type: str
     """Contact type (phone, email, chat, sms, ...)."""
 
-    value: str
-    """Number, address or URL."""
+    value: Optional[str] = None
+    """Number or address; chat contacts carry ``url`` instead."""
+
+    url: Optional[str] = None
+    """URL for chat and web contacts."""
+
+    label: Optional[str] = None
+    """Display label, when the directory has one."""
+
+    tier: Optional[Union[int, str]] = None
+    """Contact tier (``"1"`` is primary); absent on untiered rows."""
 
     source: Optional[str] = None
     """Where the contact was verified."""

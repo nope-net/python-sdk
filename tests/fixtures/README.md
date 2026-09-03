@@ -15,7 +15,7 @@ the sanitization rules below.
 | | `try.us.json` | `POST /v1/try/evaluate`, one message; requested with `config.country: GB` before the demo route honoured it, so the resources are US |
 | `oversight/` | `try.full.json`, `try.fast.json`, `auth.fast.json` | the demo full, demo fast and authenticated fast envelopes |
 | `ocular/` | `try.json`, `auth.json` | demo wire (with `heads`, `detail`) and customer wire, `meta.version` 0.3.11 |
-| `signpost/` | `auth.gb.json`, `try.smart.json`, `search.auth.json`, `countries.json`, `detect-country.miss.json` | basic (authenticated), demo smart, search (authenticated), countries, detect-country miss |
+| `signpost/` | `auth.gb.json`, `try.smart.json`, `search.auth.json`, `search.auth.mixed-contacts.json`, `countries.json`, `detect-country.miss.json` | basic (authenticated), demo smart, search (authenticated; the mixed-contacts capture from the first live run shows contacts without `tier` or `value` and chat contacts carrying `url`), countries, detect-country miss |
 | `billing/` | `balance.json`, `usage.json`, `pricing.json` | `GET /v1/billing/*` (balance and usage figures replaced) |
 | `errors/` | `400.*.json`, `401.*.json`, `404.*.json`, `413.*.json` | error bodies as served; 402, 429 and 503 are source-derived and live in the tests |
 | `headers/` | `*.txt` | rate-limit and balance headers (balance values replaced) |
