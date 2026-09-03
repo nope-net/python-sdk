@@ -1,0 +1,18 @@
+{
+  "_source": "api/src/middleware/usage.ts:139-153 (balanceMiddleware, insufficient balance on a paid route)",
+  "_headers": {
+    "X-Balance-Mills": "0",
+    "X-Balance": "$0",
+    "X-Cost-Mills": "3",
+    "X-Cost": "$0.003"
+  },
+  "error": "insufficient_balance",
+  "message": "Insufficient balance. This call costs $0.003 but you have $0.",
+  "balance": {
+    "current_mills": 0,
+    "required_mills": 3,
+    "formatted_current": "$0",
+    "formatted_required": "$0.003"
+  },
+  "topup_url": "https://dashboard.nope.net/billing"
+}

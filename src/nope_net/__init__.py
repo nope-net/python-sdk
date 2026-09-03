@@ -20,14 +20,18 @@ Example:
     ```
 """
 
+from ._http import BalanceMeta, RateLimitMeta, ResponseMeta
 from .client import AsyncNopeClient, NopeClient
 from .errors import (
     NopeAuthError,
     NopeConnectionError,
     NopeError,
     NopeFeatureError,
+    NopeInsufficientBalanceError,
+    NopeNotFoundError,
     NopeRateLimitError,
     NopeServerError,
+    NopeServiceUnavailableError,
     NopeValidationError,
 )
 from .types import (
@@ -132,10 +136,17 @@ __all__ = [
     "NopeError",
     "NopeAuthError",
     "NopeFeatureError",
+    "NopeInsufficientBalanceError",
+    "NopeNotFoundError",
     "NopeRateLimitError",
     "NopeValidationError",
     "NopeServerError",
+    "NopeServiceUnavailableError",
     "NopeConnectionError",
+    # Response meta side channel
+    "ResponseMeta",
+    "RateLimitMeta",
+    "BalanceMeta",
     # Request types
     "Message",
     "EvaluateConfig",

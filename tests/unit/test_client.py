@@ -158,7 +158,7 @@ class TestErrorMapping:
             headers={"Retry-After": "30"},
             json_body={"error": "rate_limit_exceeded"},
         )
-        client = make(api_key="test_key")
+        client = make(api_key="test_key", max_retries=0)
         with pytest.raises(NopeRateLimitError) as exc_info:
             await client.call("evaluate", messages=[{"role": "user", "content": "test"}])
         await client.close()

@@ -1,0 +1,9 @@
+{
+  "_source": "api/src/routes/v1/evaluate.ts:263-269 (ServiceUnavailableError from the evaluator)",
+  "_headers": {
+    "Retry-After": "5"
+  },
+  "error": "service_unavailable",
+  "message": "All classification providers are unavailable. Retry shortly.",
+  "retry_after_seconds": 5
+}

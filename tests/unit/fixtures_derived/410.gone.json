@@ -1,0 +1,6 @@
+{
+  "_source": "api/src/routes/v1/civility.ts:18-27 (retired route)",
+  "error": "gone",
+  "message": "This endpoint was retired on 2026-07-10.",
+  "retired": "2026-07-10"
+}

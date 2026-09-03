@@ -1,0 +1,9 @@
+{
+  "_source": "api/src/error-handler.ts:33-41 (DependencyUnavailableError, auth/billing store down)",
+  "_headers": {
+    "Retry-After": "5"
+  },
+  "error": "auth_unavailable",
+  "message": "Authentication is temporarily unavailable. Please retry.",
+  "retry_after_seconds": 5
+}

@@ -1,10 +1,21 @@
 """
-NOPE SDK Exceptions
+NOPE SDK exceptions.
 
-Structured error handling for API interactions.
+Every error raised from an HTTP response carries:
+
+- ``status_code``: the HTTP status.
+- ``code``: the machine string from the body's ``error`` field when it looks
+  like a code (``^[a-z_]+$``), or the body's ``code`` field when present.
+  ``None`` when the body only carried a sentence.
+- ``message``: ``body.message`` when present, else ``body.error``, else the
+  HTTP status text.
+- ``response_body``: the raw response text.
+
+The status-to-class mapping lives in ``nope_net._http.build_error`` and is shared
+by the sync and async clients.
 """
 
-from typing import Optional
+from typing import Any, Dict, Optional
 
 
 class NopeError(Exception):
@@ -13,50 +24,160 @@ class NopeError(Exception):
     def __init__(
         self,
         message: str,
+        *,
         status_code: Optional[int] = None,
+        code: Optional[str] = None,
         response_body: Optional[str] = None,
     ):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+        self.code = code
         self.response_body = response_body
 
     def __str__(self) -> str:
+        parts = []
         if self.status_code:
-            return f"[{self.status_code}] {self.message}"
-        return self.message
+            parts.append(f"[{self.status_code}]")
+        if self.code:
+            parts.append(f"{self.code}:")
+        parts.append(self.message)
+        return " ".join(parts)
 
 
 class NopeAuthError(NopeError):
-    """
-    Authentication error (HTTP 401).
-
-    Raised when the API key is invalid, expired, or missing.
-    """
+    """HTTP 401: the API key is missing, malformed, revoked, or expired."""
 
     def __init__(
         self,
         message: str = "Invalid or missing API key",
+        *,
+        code: Optional[str] = None,
         response_body: Optional[str] = None,
     ):
-        super().__init__(message, status_code=401, response_body=response_body)
+        super().__init__(message, status_code=401, code=code, response_body=response_body)
+
+
+class NopeValidationError(NopeError):
+    """HTTP 400 or 413: the request was rejected before processing.
+
+    ``details`` holds every extra key the body carried beside ``error`` and
+    ``message`` (``max_bytes`` on 413, ``max_messages``, ``max_content_length``,
+    ``invalid_scopes``, ``hint``, and the Oversight validator's own ``details``).
+    """
+
+    def __init__(
+        self,
+        message: str = "Invalid request",
+        *,
+        status_code: int = 400,
+        code: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(message, status_code=status_code, code=code, response_body=response_body)
+        self.details: Dict[str, Any] = details or {}
+
+
+class NopeInsufficientBalanceError(NopeError):
+    """HTTP 402: the account balance cannot cover this call.
+
+    ``balance_mills`` and ``required_mills`` are in mills (1 mill = $0.001).
+    ``per_conversation_mills`` and ``conversations`` are set only by
+    ``/v1/oversight/ingest``, which prices per conversation.
+    """
+
+    def __init__(
+        self,
+        message: str = "Insufficient balance",
+        *,
+        code: Optional[str] = None,
+        balance_mills: Optional[float] = None,
+        required_mills: Optional[float] = None,
+        formatted_current: Optional[str] = None,
+        formatted_required: Optional[str] = None,
+        topup_url: Optional[str] = None,
+        per_conversation_mills: Optional[float] = None,
+        conversations: Optional[int] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(message, status_code=402, code=code, response_body=response_body)
+        self.balance_mills = balance_mills
+        self.required_mills = required_mills
+        self.formatted_current = formatted_current
+        self.formatted_required = formatted_required
+        self.topup_url = topup_url
+        self.per_conversation_mills = per_conversation_mills
+        self.conversations = conversations
+
+
+class NopeFeatureError(NopeError):
+    """HTTP 403 for a gated feature.
+
+    Two body shapes reach this class. A feature gate (``feature`` plus
+    ``required_access``, for Oversight and Ocular) and a paid-plan gate
+    (``upgrade_url``), which is reported as ``feature = "paid_plan"``.
+    """
+
+    def __init__(
+        self,
+        message: str = "Feature not enabled for this account",
+        *,
+        code: Optional[str] = None,
+        feature: Optional[str] = None,
+        required_access: Optional[str] = None,
+        upgrade_url: Optional[str] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(message, status_code=403, code=code, response_body=response_body)
+        self.feature = feature
+        self.required_access = required_access
+        self.upgrade_url = upgrade_url
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.feature:
+            return f"{base} (feature: {self.feature})"
+        return base
+
+
+class NopeNotFoundError(NopeError):
+    """HTTP 404: the resource, webhook, or route does not exist."""
+
+    def __init__(
+        self,
+        message: str = "Not found",
+        *,
+        code: Optional[str] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(message, status_code=404, code=code, response_body=response_body)
 
 
 class NopeRateLimitError(NopeError):
-    """
-    Rate limit exceeded (HTTP 429).
+    """HTTP 429: rate limit exceeded.
 
-    Check retry_after for when to retry.
+    ``retry_after`` is in seconds (from the ``Retry-After`` header, else the
+    body's ``retry_after_seconds``). ``limit``, ``remaining`` and ``reset``
+    (epoch milliseconds) mirror the ``X-RateLimit-*`` headers.
     """
 
     def __init__(
         self,
         message: str = "Rate limit exceeded",
+        *,
+        code: Optional[str] = None,
         retry_after: Optional[float] = None,
+        limit: Optional[int] = None,
+        remaining: Optional[int] = None,
+        reset: Optional[int] = None,
         response_body: Optional[str] = None,
     ):
-        super().__init__(message, status_code=429, response_body=response_body)
-        self.retry_after = retry_after  # seconds
+        super().__init__(message, status_code=429, code=code, response_body=response_body)
+        self.retry_after = retry_after
+        self.limit = limit
+        self.remaining = remaining
+        self.reset = reset
 
     def __str__(self) -> str:
         base = super().__str__()
@@ -65,74 +186,60 @@ class NopeRateLimitError(NopeError):
         return base
 
 
-class NopeValidationError(NopeError):
-    """
-    Validation error (HTTP 400).
-
-    Raised when the request payload is invalid.
-    """
-
-    def __init__(
-        self,
-        message: str = "Invalid request",
-        response_body: Optional[str] = None,
-    ):
-        super().__init__(message, status_code=400, response_body=response_body)
-
-
 class NopeServerError(NopeError):
-    """
-    Server error (HTTP 5xx).
+    """HTTP 5xx other than 503.
 
-    Raised when the NOPE API encounters an internal error.
+    ``retry_after`` is set only when the response carried a ``Retry-After``
+    header or ``retry_after_seconds`` in the body. The client never retries
+    these itself: paid routes charge before the handler runs and refund on
+    failure, so a blind retry after a timeout could double-bill.
     """
 
     def __init__(
         self,
         message: str = "Server error",
+        *,
         status_code: int = 500,
+        code: Optional[str] = None,
+        retry_after: Optional[float] = None,
         response_body: Optional[str] = None,
     ):
-        super().__init__(message, status_code=status_code, response_body=response_body)
+        super().__init__(message, status_code=status_code, code=code, response_body=response_body)
+        self.retry_after = retry_after
+
+
+class NopeServiceUnavailableError(NopeServerError):
+    """HTTP 503: a dependency or every classification provider is down.
+
+    ``retry_after`` is in seconds. The client retries 503 (and 429) up to
+    ``max_retries`` times before raising this.
+    """
+
+    def __init__(
+        self,
+        message: str = "Service unavailable",
+        *,
+        code: Optional[str] = None,
+        retry_after: Optional[float] = None,
+        response_body: Optional[str] = None,
+    ):
+        super().__init__(
+            message,
+            status_code=503,
+            code=code,
+            retry_after=retry_after,
+            response_body=response_body,
+        )
 
 
 class NopeConnectionError(NopeError):
-    """
-    Connection error.
-
-    Raised when unable to connect to the NOPE API.
-    """
+    """The request never produced an HTTP response (connect failure, timeout)."""
 
     def __init__(
         self,
         message: str = "Failed to connect to NOPE API",
+        *,
         original_error: Optional[Exception] = None,
     ):
         super().__init__(message)
         self.original_error = original_error
-
-
-class NopeFeatureError(NopeError):
-    """
-    Feature access denied (HTTP 403).
-
-    Raised when the account doesn't have access to a feature (e.g., Oversight).
-    Contact NOPE to request access to the feature.
-    """
-
-    def __init__(
-        self,
-        message: str = "Feature not enabled for this account",
-        feature: Optional[str] = None,
-        required_access: Optional[str] = None,
-        response_body: Optional[str] = None,
-    ):
-        super().__init__(message, status_code=403, response_body=response_body)
-        self.feature = feature
-        self.required_access = required_access
-
-    def __str__(self) -> str:
-        base = super().__str__()
-        if self.feature:
-            return f"{base} (feature: {self.feature})"
-        return base

@@ -1,0 +1,6 @@
+{
+  "_source": "api/src/routes/v1/oversight/analyze.ts:209-214 (feature gate)",
+  "error": "Oversight feature is not enabled for this account",
+  "feature": "OVERSIGHT",
+  "required_access": "admin"
+}

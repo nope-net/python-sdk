@@ -1,0 +1,5 @@
+{
+  "_source": "api/src/routes/v1/try.ts:100-105 (demo route, use_multiple_judges)",
+  "error": "Multiple judges feature requires an API key",
+  "upgrade_url": "https://dashboard.nope.net"
+}

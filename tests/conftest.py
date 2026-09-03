@@ -27,6 +27,18 @@ def load_fixture(relative_path: str) -> Any:
         return json.load(fh)
 
 
+DERIVED_DIR = Path(__file__).parent / "unit" / "fixtures_derived"
+
+
+def load_derived(name: str) -> Tuple[Dict[str, Any], Dict[str, str]]:
+    """Load a source-derived error body: returns ``(body, headers)`` minus the ``_`` keys."""
+    with (DERIVED_DIR / name).open(encoding="utf-8") as fh:
+        raw = json.load(fh)
+    headers = dict(raw.get("_headers", {}))
+    body = {k: v for k, v in raw.items() if not k.startswith("_")}
+    return body, headers
+
+
 def load_header_fixture(relative_path: str) -> Dict[str, str]:
     """Load a ``headers/*.txt`` fixture (``name: value`` per line)."""
     headers: Dict[str, str] = {}
@@ -200,8 +212,10 @@ __all__ = [
     "CannedResponse",
     "ClientFactory",
     "ClientRunner",
+    "DERIVED_DIR",
     "FIXTURES_DIR",
     "FakeApi",
+    "load_derived",
     "load_fixture",
     "load_header_fixture",
     "make_client",

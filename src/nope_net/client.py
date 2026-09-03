@@ -4,19 +4,22 @@ NOPE SDK Client
 Main client for interacting with the NOPE API.
 """
 
+import asyncio
+import time
 import warnings
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Union
 
 import httpx
 
-from .errors import (
-    NopeAuthError,
-    NopeConnectionError,
-    NopeError,
-    NopeFeatureError,
-    NopeRateLimitError,
-    NopeServerError,
-    NopeValidationError,
+from ._http import (
+    DEFAULT_MAX_RETRIES,
+    ResponseMeta,
+    build_error,
+    connection_error_from,
+    decode_success,
+    is_retryable,
+    parse_response_meta,
+    retry_wait_seconds,
 )
 from .types import (
     DetectCountryResponse,
@@ -76,25 +79,35 @@ class NopeClient:
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
         demo: bool = False,
+        max_retries: int = DEFAULT_MAX_RETRIES,
         transport: Optional[httpx.BaseTransport] = None,
+        sleep: Optional[Callable[[float], None]] = None,
     ):
         """
         Initialize the NOPE client.
 
         Args:
-            api_key: Your NOPE API key (starts with 'nope_live_' or 'nope_test_').
-                     Can be None for local development/testing without auth.
+            api_key: Your NOPE API key (``nope_live_...``, minted in the dashboard).
+                     None for demo mode or for public routes.
             base_url: Override the API base URL. Defaults to https://api.nope.net.
             timeout: Request timeout in seconds. Defaults to 30.
-            demo: Use demo/try endpoints that don't require authentication.
-                  These are rate-limited but useful for testing and evaluation.
+            demo: Route to the ``/v1/try/*`` endpoints, which need no key. Rate-limited
+                  per IP; methods with no demo route raise ``ValueError``.
+            max_retries: How many times a 429 or 503 is retried (default 2). Waits honour
+                  ``Retry-After`` (capped at 30 s). Timeouts, connection failures and
+                  other 5xx are never retried: paid routes charge before the handler
+                  runs, so a retried timeout could double-bill.
             transport: An httpx transport to route requests through. Tests pass an
                        ``httpx.MockTransport`` here instead of patching the module.
+            sleep: Replacement for ``time.sleep`` used between retries (tests).
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.demo = demo
+        self.max_retries = max_retries
+        self._sleep: Callable[[float], None] = sleep if sleep is not None else time.sleep
+        self._last_response_meta: Optional[ResponseMeta] = None
 
         headers = {
             "Content-Type": "application/json",
@@ -119,6 +132,11 @@ class NopeClient:
     def close(self) -> None:
         """Close the HTTP client."""
         self._client.close()
+
+    @property
+    def last_response_meta(self) -> Optional[ResponseMeta]:
+        """Rate-limit and balance headers from the most recent response (None before any call)."""
+        return self._last_response_meta
 
     def evaluate(
         self,
@@ -959,109 +977,33 @@ class NopeClient:
         self,
         method: str,
         path: str,
-        **kwargs: Any,
+        *,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
+        """Send one API call, retrying 429/503 per the shared policy, and decode the body.
+
+        Error classification, retry waits and the response-meta side channel all
+        come from ``nope_net._http`` so this and the async client behave identically.
         """
-        Make an HTTP request to the API.
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            path: API path (e.g., '/v1/evaluate')
-            **kwargs: Additional arguments passed to httpx.request()
-
-        Returns:
-            Parsed JSON response.
-
-        Raises:
-            NopeAuthError: 401 response.
-            NopeValidationError: 400 response.
-            NopeRateLimitError: 429 response.
-            NopeServerError: 5xx response.
-            NopeConnectionError: Connection failed.
-        """
-        try:
-            response = self._client.request(method, path, **kwargs)
-        except httpx.ConnectError as e:
-            raise NopeConnectionError(
-                f"Failed to connect to {self.base_url}",
-                original_error=e,
-            ) from e
-        except httpx.TimeoutException as e:
-            raise NopeConnectionError(
-                f"Request timed out after {self.timeout}s",
-                original_error=e,
-            ) from e
-        except httpx.HTTPError as e:
-            raise NopeConnectionError(
-                f"HTTP error: {e}",
-                original_error=e,
-            ) from e
-
-        return self._handle_response(response)
-
-    def _handle_response(self, response: httpx.Response) -> Any:
-        """
-        Handle API response, raising appropriate errors for non-2xx status codes.
-        """
-        if response.is_success:
-            return response.json()
-
-        # Try to parse error message from response
-        try:
-            error_data = response.json()
-            error_message = error_data.get("error", response.text)
-        except Exception:
-            error_message = response.text
-
-        response_body = response.text
-
-        if response.status_code == 401:
-            raise NopeAuthError(error_message, response_body=response_body)
-
-        if response.status_code == 400:
-            raise NopeValidationError(error_message, response_body=response_body)
-
-        if response.status_code == 403:
-            # Check if this is a feature access error
+        attempt = 0
+        while True:
             try:
-                import json
+                response = self._client.request(
+                    method, path, json=json, params=params, headers=headers
+                )
+            except httpx.HTTPError as exc:
+                raise connection_error_from(exc, self.base_url, self.timeout) from exc
 
-                error_data = json.loads(response_body)
-                if error_data.get("feature"):
-                    raise NopeFeatureError(
-                        error_message,
-                        feature=error_data.get("feature"),
-                        required_access=error_data.get("required_access"),
-                        response_body=response_body,
-                    )
-            except (json.JSONDecodeError, NopeFeatureError) as e:
-                if isinstance(e, NopeFeatureError):
-                    raise
-                # Not a feature error, fall through to generic 403
-            raise NopeError(error_message, status_code=403, response_body=response_body)
-
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            retry_after_seconds = float(retry_after) if retry_after else None
-            raise NopeRateLimitError(
-                error_message,
-                retry_after=retry_after_seconds,
-                response_body=response_body,
-            )
-
-        if response.status_code >= 500:
-            raise NopeServerError(
-                error_message,
-                status_code=response.status_code,
-                response_body=response_body,
-            )
-
-        # Generic error for other status codes
-        raise NopeError(
-            error_message,
-            status_code=response.status_code,
-            response_body=response_body,
-        )
+            self._last_response_meta = parse_response_meta(response.headers)
+            if response.is_success:
+                return decode_success(response)
+            if is_retryable(response.status_code) and attempt < self.max_retries:
+                self._sleep(retry_wait_seconds(response.headers, response.text, attempt))
+                attempt += 1
+                continue
+            raise build_error(response.status_code, response.headers, response.text)
 
 
 class AsyncNopeClient:
@@ -1091,22 +1033,25 @@ class AsyncNopeClient:
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
         demo: bool = False,
+        max_retries: int = DEFAULT_MAX_RETRIES,
         transport: Optional[httpx.AsyncBaseTransport] = None,
+        sleep: Optional[Callable[[float], Awaitable[None]]] = None,
     ):
         """
         Initialize the async NOPE client.
 
-        Args:
-            api_key: Your NOPE API key. Can be None for local development/testing.
-            base_url: Override the API base URL.
-            timeout: Request timeout in seconds.
-            demo: Use demo/try endpoints that don't require authentication.
-            transport: An httpx async transport to route requests through (tests).
+        Same options as :class:`NopeClient`; ``sleep`` is an async callable
+        (defaults to ``asyncio.sleep``).
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self.timeout = timeout or self.DEFAULT_TIMEOUT
         self.demo = demo
+        self.max_retries = max_retries
+        self._sleep: Callable[[float], Awaitable[None]] = (
+            sleep if sleep is not None else asyncio.sleep
+        )
+        self._last_response_meta: Optional[ResponseMeta] = None
 
         headers = {
             "Content-Type": "application/json",
@@ -1131,6 +1076,11 @@ class AsyncNopeClient:
     async def close(self) -> None:
         """Close the HTTP client."""
         await self._client.aclose()
+
+    @property
+    def last_response_meta(self) -> Optional[ResponseMeta]:
+        """Rate-limit and balance headers from the most recent response (None before any call)."""
+        return self._last_response_meta
 
     async def evaluate(
         self,
@@ -1610,85 +1560,26 @@ class AsyncNopeClient:
         self,
         method: str,
         path: str,
-        **kwargs: Any,
+        *,
+        json: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, str]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
-        """Make an async HTTP request to the API."""
-        try:
-            response = await self._client.request(method, path, **kwargs)
-        except httpx.ConnectError as e:
-            raise NopeConnectionError(
-                f"Failed to connect to {self.base_url}",
-                original_error=e,
-            ) from e
-        except httpx.TimeoutException as e:
-            raise NopeConnectionError(
-                f"Request timed out after {self.timeout}s",
-                original_error=e,
-            ) from e
-        except httpx.HTTPError as e:
-            raise NopeConnectionError(
-                f"HTTP error: {e}",
-                original_error=e,
-            ) from e
-
-        return self._handle_response(response)
-
-    def _handle_response(self, response: httpx.Response) -> Any:
-        """Handle API response."""
-        if response.is_success:
-            return response.json()
-
-        try:
-            error_data = response.json()
-            error_message = error_data.get("error", response.text)
-        except Exception:
-            error_message = response.text
-
-        response_body = response.text
-
-        if response.status_code == 401:
-            raise NopeAuthError(error_message, response_body=response_body)
-
-        if response.status_code == 400:
-            raise NopeValidationError(error_message, response_body=response_body)
-
-        if response.status_code == 403:
-            # Check if this is a feature access error
+        """Async twin of ``NopeClient._request``; same shared policy, awaited."""
+        attempt = 0
+        while True:
             try:
-                import json
+                response = await self._client.request(
+                    method, path, json=json, params=params, headers=headers
+                )
+            except httpx.HTTPError as exc:
+                raise connection_error_from(exc, self.base_url, self.timeout) from exc
 
-                error_data = json.loads(response_body)
-                if error_data.get("feature"):
-                    raise NopeFeatureError(
-                        error_message,
-                        feature=error_data.get("feature"),
-                        required_access=error_data.get("required_access"),
-                        response_body=response_body,
-                    )
-            except (json.JSONDecodeError, NopeFeatureError) as e:
-                if isinstance(e, NopeFeatureError):
-                    raise
-                # Not a feature error, fall through to generic 403
-            raise NopeError(error_message, status_code=403, response_body=response_body)
-
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            retry_after_seconds = float(retry_after) if retry_after else None
-            raise NopeRateLimitError(
-                error_message,
-                retry_after=retry_after_seconds,
-                response_body=response_body,
-            )
-
-        if response.status_code >= 500:
-            raise NopeServerError(
-                error_message,
-                status_code=response.status_code,
-                response_body=response_body,
-            )
-
-        raise NopeError(
-            error_message,
-            status_code=response.status_code,
-            response_body=response_body,
-        )
+            self._last_response_meta = parse_response_meta(response.headers)
+            if response.is_success:
+                return decode_success(response)
+            if is_retryable(response.status_code) and attempt < self.max_retries:
+                await self._sleep(retry_wait_seconds(response.headers, response.text, attempt))
+                attempt += 1
+                continue
+            raise build_error(response.status_code, response.headers, response.text)

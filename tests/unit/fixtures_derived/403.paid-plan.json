@@ -1,0 +1,6 @@
+{
+  "_source": "api/src/routes/v1/webhooks.ts:104-110 (webhook create without a paid plan)",
+  "error": "paid_plan_required",
+  "message": "Webhooks are available on paid plans. Please upgrade to use this feature.",
+  "upgrade_url": "https://dashboard.nope.net/billing"
+}

@@ -1,0 +1,15 @@
+{
+  "_source": "api/src/middleware/rate-limit.ts:159-182 (rateLimitMiddleware, limit exceeded)",
+  "_headers": {
+    "Retry-After": "7",
+    "X-RateLimit-Limit": "10",
+    "X-RateLimit-Remaining": "0",
+    "X-RateLimit-Reset": "1788396967000"
+  },
+  "error": "rate_limit_exceeded",
+  "message": "Rate limit exceeded. Please retry after 7 seconds.",
+  "retry_after_seconds": 7,
+  "limit": 10,
+  "remaining": 0,
+  "reset": 1788396967000
+}

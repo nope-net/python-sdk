@@ -1,0 +1,14 @@
+{
+  "_source": "api/src/routes/v1/oversight/ingest.ts:280-292 (ingest pre-deduction check)",
+  "error": "insufficient_balance",
+  "message": "Insufficient balance. Ingesting 2 conversations costs $0.20 ($0.10/conversation) but you have $0.05.",
+  "balance": {
+    "current_mills": 50,
+    "required_mills": 200,
+    "formatted_current": "$0.05",
+    "formatted_required": "$0.20",
+    "per_conversation_mills": 100,
+    "conversations": 2
+  },
+  "topup_url": "https://dashboard.nope.net/billing"
+}
