@@ -8,7 +8,7 @@ contract tests under ``tests/contract/`` pin every shape to a live capture.
 Risks separate WHO is at risk (``subject``) from WHAT kind of harm (``type``).
 """
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field
 
@@ -687,6 +687,13 @@ class DetectCountryResponse(BaseModel):
     def detected(self) -> bool:
         """True when ``country_code`` is non-empty."""
         return self.country_code != ""
+
+    def __repr_args__(self) -> Iterator[Tuple[Optional[str], Any]]:
+        # A property is absent from pydantic's default repr, so a miss printed
+        # as country_code='' with no sign of the derived flag. Shown last; it is
+        # still not a field and never reaches model_dump().
+        yield from super().__repr_args__()
+        yield "detected", self.detected
 
 
 class SignpostConfig(BaseModel):

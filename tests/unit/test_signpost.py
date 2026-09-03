@@ -370,3 +370,16 @@ class TestDeprecatedResources:
         await client.close()
 
         assert api.last_request.url.path == "/v1/try/resources/smart"
+
+
+def test_detect_country_repr_shows_detected() -> None:
+    """detected is a property, so pydantic's default repr and str omit it."""
+    miss = DetectCountryResponse.model_validate(load_fixture("signpost/detect-country.miss.json"))
+    assert "detected=False" in repr(miss)
+    assert "detected=False" in str(miss)
+
+    hit = DetectCountryResponse(country_code="GB", country_name="United Kingdom")
+    assert "detected=True" in repr(hit)
+    assert "country_code='GB'" in repr(hit)
+    assert "detected" not in hit.model_dump()
+    assert "detected" not in DetectCountryResponse.model_fields
