@@ -47,6 +47,11 @@ changed or removed.
   `bot_context` reaches the Oversight analysis prompt, and trajectory roles
   are `user` or `assistant`. The `screen()` docstring names the 2027-01-01
   sunset the runtime warning already carried.
+- Oversight ingest documentation now states the deployed 5 MB body limit.
+  Analyze documentation distinguishes retained event metadata from the
+  conversation and full-result records created by ingest. Signpost's
+  `urgent` option is consistently described as a ranking hint.
+- Package metadata identifies the SDK as beta, matching the service status.
 
 ## 4.0.0 - 2026-09-03
 
@@ -54,7 +59,7 @@ Realigns the SDK with the API at commit 73c477c. Every v1 response model is now
 pinned to a sanitized live capture under `tests/fixtures/` (the deprecated
 `/v0/screen` models have none), and the two
 versions that never reached PyPI (2.3.1, 3.0.0) are folded into this release.
-The last published version is 2.3.0.
+The preceding published version was 2.3.0.
 
 ### Breaking changes
 

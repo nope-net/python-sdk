@@ -58,7 +58,7 @@ def test_verify_request_without_delivery_header() -> None:
 
 
 def test_live_fixture_delivery_id_is_distinct_from_payload_event_id() -> None:
-    """The API sends the payload's event_id as X-NOPE-Delivery-ID (signature.ts)."""
+    """The API sends the stored delivery id as X-NOPE-Delivery-ID."""
     for event in ("evaluate.alert", "oversight.alert", "oversight.ingestion.complete", "test.ping"):
         fx = load_fixture(f"webhooks/{event}.json")
         verified = Webhook.verify_request(

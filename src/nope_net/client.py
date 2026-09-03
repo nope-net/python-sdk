@@ -405,9 +405,11 @@ class NopeClient:
         """
         Analyze one conversation for harmful AI behaviours ($0.10 per call).
 
-        Synchronous; nothing is stored. Use :meth:`oversight_ingest` for
-        persistent storage and the dashboard. Turn numbers in the result are
-        1-based and count assistant turns.
+        The call is synchronous and does not write conversation content or full
+        results to the Oversight application database. Operational and
+        analysis-event metadata is retained under the public policy. Use
+        :meth:`oversight_ingest` for persistent dashboard storage. Turn numbers
+        in the result are 1-based and count assistant turns.
 
         Args:
             conversation: ``conversation_id``, ``messages`` (role ``user``, ``assistant``
@@ -489,7 +491,7 @@ class NopeClient:
             conversations: Conversations (at most 300), each with a ``conversation_id``
                 and non-empty ``messages``; any sequence of dicts, mappings or
                 ``OversightConversation`` models. The request body is capped at
-                512 KB, so a batch near the count limit must consist of short
+                5 MB, so a batch near the count limit must consist of short
                 conversations.
             webhook_url: Legacy per-request callback. The API POSTs an unsigned
                 ``{event: 'ingestion_complete', timestamp, ingestion_id,
@@ -563,7 +565,8 @@ class NopeClient:
             populations: Populations from ``nope_net.POPULATIONS`` (e.g. "youth").
             subdivisions: ISO 3166-2 codes within the country (e.g. "GB-SCT").
             limit: Maximum resources (the API clamps to 10).
-            urgent: Only 24/7 resources.
+            urgent: Ranking hint. Places 24/7 resources first among ties on
+                relevance and priority tier without filtering other matches.
 
         Returns:
             SignpostResponse with ``resources`` (and ``primary``/``secondary`` when

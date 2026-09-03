@@ -719,7 +719,8 @@ class SignpostConfig(BaseModel):
     """Maximum number of resources to return (the API clamps to 10)."""
 
     urgent: Optional[bool] = None
-    """Only return 24/7 urgent resources."""
+    """Ranking hint. Places 24/7 resources first among ties on relevance and
+    priority tier without filtering other matches."""
 
 
 class SignpostSmartConfig(BaseModel):
