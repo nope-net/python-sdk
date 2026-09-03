@@ -238,6 +238,101 @@ def parse_webhook_payload(data: Dict[str, Any]) -> Any:
 
 
 # =============================================================================
+# Management route shapes (/v1/webhooks)
+# =============================================================================
+
+WebhookDeliveryStatus = Literal["pending", "sent", "failed"]
+
+
+class WebhookResponse(BaseModel):
+    """A webhook configuration as returned by the management routes."""
+
+    model_config = {"extra": "allow"}
+
+    id: str
+    url: str
+    min_risk_level: WebhookRiskLevel
+    enabled: bool
+    include_conversation: bool
+    created_at: str
+    updated_at: str
+    secret: Optional[str] = None
+    """Returned only by ``create``; rotate with ``regenerate_secret``."""
+
+
+class WebhookUpdate(BaseModel):
+    """Patch for ``client.webhooks.update``; every field optional."""
+
+    url: Optional[str] = None
+    min_risk_level: Optional[WebhookRiskLevel] = None
+    enabled: Optional[bool] = None
+    include_conversation: Optional[bool] = None
+
+
+class WebhookListResponse(BaseModel):
+    """``GET /v1/webhooks``."""
+
+    model_config = {"extra": "allow"}
+
+    webhooks: List[WebhookResponse]
+
+
+class WebhookDeleteResponse(BaseModel):
+    """``DELETE /v1/webhooks/:id``."""
+
+    model_config = {"extra": "allow"}
+
+    success: bool
+
+
+class WebhookSecretResponse(BaseModel):
+    """``POST /v1/webhooks/:id/regenerate-secret``."""
+
+    model_config = {"extra": "allow"}
+
+    secret: str
+
+
+class WebhookDeliveryResult(BaseModel):
+    """Outcome of one delivery attempt (``POST /v1/webhooks/:id/test``)."""
+
+    model_config = {"extra": "allow"}
+
+    success: bool
+    http_status: Optional[int] = None
+    error_message: Optional[str] = None
+    duration_ms: int
+
+
+class WebhookEvent(BaseModel):
+    """A stored delivery record (``GET /v1/webhooks/:id/events``)."""
+
+    model_config = {"extra": "allow"}
+
+    id: str
+    webhook_id: str
+    event_type: str
+    payload: Annotated[Union[WebhookPayload, Dict[str, Any]], Field(union_mode="left_to_right")]
+    """The delivered body, parsed into its payload model when it is one of the
+    four current events, else kept as a dict (older stored rows)."""
+    status: WebhookDeliveryStatus
+    http_status: Optional[int] = None
+    error_message: Optional[str] = None
+    attempt_count: int
+    last_attempt_at: Optional[str] = None
+    next_retry_at: Optional[str] = None
+    created_at: str
+
+
+class WebhookEventsResponse(BaseModel):
+    """``GET /v1/webhooks/events`` and ``GET /v1/webhooks/:id/events``."""
+
+    model_config = {"extra": "allow"}
+
+    events: List[WebhookEvent]
+
+
+# =============================================================================
 # Errors and results
 # =============================================================================
 

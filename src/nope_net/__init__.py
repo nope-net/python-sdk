@@ -30,6 +30,7 @@ from ._generated.oversight_taxonomy import (
 )
 from ._generated.signpost_enums import POPULATIONS, SERVICE_SCOPES, Population, ServiceScope
 from ._http import BalanceMeta, RateLimitMeta, ResponseMeta
+from ._namespaces import AsyncBillingClient, AsyncWebhooksClient, BillingClient, WebhooksClient
 from .client import AsyncNopeClient, NopeClient
 from .errors import (
     NopeAuthError,
@@ -47,6 +48,16 @@ from .types import (
     IMMINENCE_SCORES,
     SEVERITY_SCORES,
     AggregatedBehavior,
+    BillingBalanceResponse,
+    BillingPricingEntry,
+    BillingPricingResponse,
+    BillingTopupHistoryEntry,
+    BillingTopupOption,
+    BillingTopupResponse,
+    BillingUsageBreakdownEntry,
+    BillingUsageHistoryResponse,
+    BillingUsageRecord,
+    BillingUsageResponse,
     ConcernLevel,
     CrisisResource,
     CrisisResourceKind,
@@ -147,15 +158,24 @@ from .webhook import (
     VerifiedWebhook,
     Webhook,
     WebhookConversation,
+    WebhookDeleteResponse,
+    WebhookDeliveryResult,
+    WebhookDeliveryStatus,
     WebhookDomainAssessment,
+    WebhookEvent,
+    WebhookEventsResponse,
     WebhookEventType,
     WebhookFlags,
+    WebhookListResponse,
     WebhookPayload,
     WebhookPayloadBase,
     WebhookResourceProvided,
+    WebhookResponse,
     WebhookRiskLevel,
     WebhookRiskSummary,
+    WebhookSecretResponse,
     WebhookSignatureError,
+    WebhookUpdate,
     parse_webhook_payload,
 )
 
@@ -166,6 +186,10 @@ __all__ = [
     # Clients
     "NopeClient",
     "AsyncNopeClient",
+    "WebhooksClient",
+    "AsyncWebhooksClient",
+    "BillingClient",
+    "AsyncBillingClient",
     # Errors
     "NopeError",
     "NopeAuthError",
@@ -311,4 +335,25 @@ __all__ = [
     "WebhookFlags",
     "WebhookResourceProvided",
     "WebhookConversation",
+    # Webhook management
+    "WebhookResponse",
+    "WebhookUpdate",
+    "WebhookListResponse",
+    "WebhookDeleteResponse",
+    "WebhookSecretResponse",
+    "WebhookDeliveryResult",
+    "WebhookDeliveryStatus",
+    "WebhookEvent",
+    "WebhookEventsResponse",
+    # Billing
+    "BillingBalanceResponse",
+    "BillingTopupHistoryEntry",
+    "BillingTopupOption",
+    "BillingUsageResponse",
+    "BillingUsageBreakdownEntry",
+    "BillingUsageHistoryResponse",
+    "BillingUsageRecord",
+    "BillingPricingResponse",
+    "BillingPricingEntry",
+    "BillingTopupResponse",
 ]

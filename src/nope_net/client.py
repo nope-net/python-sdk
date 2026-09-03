@@ -22,6 +22,7 @@ from ._http import (
     parse_response_meta,
     retry_wait_seconds,
 )
+from ._namespaces import AsyncBillingClient, AsyncWebhooksClient, BillingClient, WebhooksClient
 from ._requests import (
     build_evaluate_request,
     build_ocular_request,
@@ -136,6 +137,10 @@ class NopeClient:
         self.max_retries = max_retries
         self._sleep: Callable[[float], None] = sleep if sleep is not None else time.sleep
         self._last_response_meta: Optional[ResponseMeta] = None
+        self.webhooks = WebhooksClient(self)
+        """Webhook management: ``client.webhooks.create/list/get/update/delete/...``."""
+        self.billing = BillingClient(self)
+        """Billing: ``client.billing.balance/usage/usage_history/pricing/topup``."""
 
         headers = {
             "Content-Type": "application/json",
@@ -801,6 +806,8 @@ class AsyncNopeClient:
             sleep if sleep is not None else asyncio.sleep
         )
         self._last_response_meta: Optional[ResponseMeta] = None
+        self.webhooks = AsyncWebhooksClient(self)
+        self.billing = AsyncBillingClient(self)
 
         headers = {
             "Content-Type": "application/json",

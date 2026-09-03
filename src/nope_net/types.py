@@ -1551,3 +1551,137 @@ class SignpostSearchResponse(BaseModel):
 
     timing: Optional[SignpostSearchTiming] = None
     """Timing breakdown for the search."""
+
+
+# =============================================================================
+# Billing (/v1/billing/*). Amounts are mills: 1 mill = $0.001.
+# =============================================================================
+
+
+class BillingTopupHistoryEntry(BaseModel):
+    """A past top-up."""
+
+    model_config = {"extra": "allow"}
+
+    id: str
+    amount_mills: float
+    amount_formatted: str
+    status: str
+    created_at: str
+    completed_at: Optional[str] = None
+
+
+class BillingTopupOption(BaseModel):
+    """A purchasable top-up amount with the calls it buys."""
+
+    model_config = {"extra": "allow"}
+
+    id: str
+    amount_mills: float
+    label: str
+    evaluates: int
+    resources_smart: int
+    screens: Optional[int] = None
+    """Absent from the wire until API fix A-5 is deployed."""
+
+
+class BillingBalanceResponse(BaseModel):
+    """``GET /v1/billing/balance``."""
+
+    model_config = {"extra": "allow"}
+
+    balance_mills: float
+    balance_formatted: str
+    estimated_evaluates: int
+    estimated_resources_smart: int
+    estimated_screens: Optional[int] = None
+    """Absent from the wire until API fix A-5 is deployed."""
+    low_balance: bool
+    topup_history: List[BillingTopupHistoryEntry]
+    topup_options: List[BillingTopupOption]
+
+
+class BillingUsageBreakdownEntry(BaseModel):
+    """Spend for one endpoint over the period."""
+
+    model_config = {"extra": "allow"}
+
+    endpoint: str
+    calls: int
+    cost_mills: float
+    cost_formatted: str
+    referrals: int
+
+
+class BillingUsageResponse(BaseModel):
+    """``GET /v1/billing/usage``."""
+
+    model_config = {"extra": "allow"}
+
+    period_start: str
+    period_end: Optional[str] = None
+    total_spend_mills: float
+    total_spend_formatted: str
+    breakdown: List[BillingUsageBreakdownEntry]
+
+
+class BillingUsageRecord(BaseModel):
+    """One billed call."""
+
+    model_config = {"extra": "allow"}
+
+    id: str
+    endpoint: str
+    cost_mills: float
+    cost_formatted: str
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: str
+
+
+class BillingUsageHistoryResponse(BaseModel):
+    """``GET /v1/billing/usage/history``."""
+
+    model_config = {"extra": "allow"}
+
+    records: List[BillingUsageRecord]
+    total: int
+    limit: int
+    offset: int
+
+
+class BillingPricingEntry(BaseModel):
+    """Price of one endpoint."""
+
+    model_config = {"extra": "allow"}
+
+    cost_mills: Optional[float] = None
+    """Absent for the ``screen`` entry until API fix A-5 is deployed."""
+    cost_display: str
+    description: Optional[str] = None
+
+
+class BillingPricingResponse(BaseModel):
+    """``GET /v1/billing/pricing`` (public).
+
+    ``pricing`` is keyed by endpoint name (``evaluate``, ``ocular``,
+    ``signpost_smart``, ``resources_smart``, ``oversight_analyze``,
+    ``oversight_ingest``, ``v0_screen``, ``screen``, ``v0_evaluate``,
+    ``resources``); unknown keys are kept.
+    """
+
+    model_config = {"extra": "allow"}
+
+    unit: str
+    unit_description: str
+    pricing: Dict[str, BillingPricingEntry]
+    topup_options: List[BillingTopupOption]
+    free_credit_mills: float
+    free_credit_display: str
+
+
+class BillingTopupResponse(BaseModel):
+    """``POST /v1/billing/topup``: a Stripe Checkout URL."""
+
+    model_config = {"extra": "allow"}
+
+    checkout_url: str
