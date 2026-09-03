@@ -270,7 +270,7 @@ class NopeClient:
         """
         warnings.warn(
             "screen() is deprecated. Use evaluate() instead ($0.003/call). "
-            "screen() calls the legacy /v0/screen endpoint.",
+            "screen() calls the legacy /v0/screen endpoint, which carries a sunset of 2027-01-01.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -876,7 +876,7 @@ class AsyncNopeClient:
         """
         warnings.warn(
             "screen() is deprecated. Use evaluate() instead ($0.003/call). "
-            "screen() calls the legacy /v0/screen endpoint.",
+            "screen() calls the legacy /v0/screen endpoint, which carries a sunset of 2027-01-01.",
             DeprecationWarning,
             stacklevel=2,
         )
