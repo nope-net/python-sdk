@@ -23,6 +23,7 @@ from ._http import (
 )
 from ._requests import (
     build_evaluate_request,
+    build_ocular_request,
     build_oversight_analyze_request,
     build_oversight_ingest_request,
     build_screen_request,
@@ -32,6 +33,7 @@ from .types import (
     EvaluateConfig,
     EvaluateResponse,
     Message,
+    OcularDemoResponse,
     OcularResponse,
     OversightAnalyzeConfig,
     OversightAnalyzeResponse,
@@ -264,73 +266,83 @@ class NopeClient:
         messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
+        per_turn: Optional[bool] = None,
+        trajectory_stride: Optional[int] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> OcularResponse:
         """
-        Behavioral risk assessment via Ocular.
+        Behavioral risk assessment via Ocular ($0.0001 per call).
 
-        Returns a continuous ``salience`` score in [0, 1] plus structural
-        axes — 8 user-risk axes under ``signals.user``, 4 AI-behavior axes
-        under ``signals.ai``, an ``imminence`` axis, and ``fiction`` /
+        Returns a continuous ``salience`` score in [0, 1] plus structural axes:
+        8 user-risk axes under ``signals.user``, 4 AI-behavior axes under
+        ``signals.ai``, an ``imminence`` axis, and the ``fiction`` and
         ``authenticity`` context modulators. Individual behavioral code
-        identities are not exposed.
+        identities are not exposed on the customer wire.
 
         Customer code keys decisions off ``salience``: pick the cutoff that
         fits your action. Reference thresholds (T_WATCH=0.30, T_DANGER=0.60)
         match the band view in dashboard.nope.net/ocular.
 
-        Either ``messages`` or ``text`` must be provided, but not both.
+        Exactly one of ``messages`` or ``text`` must be given.
 
         Args:
             messages: Conversation messages (each {role: 'user'|'assistant', content: str}).
             text: Plain text input (alternative to messages).
-            thoroughness: How many ensemble variants to run — 'fast' (1 variant,
-                lowest latency), 'auto' (server default), 'thorough' (multiple
-                variants, populates ``stability``). Omit for the server default.
+            thoroughness: 'fast' (1 variant, lowest latency), 'auto' (server default),
+                'thorough' (multiple variants, populates ``stability``).
+            per_turn: Score every turn and return ``trajectory`` (per-turn salience and
+                ``signals_by_axis``) plus ``trajectory_shape``. Off by default; the
+                price is unchanged.
+            trajectory_stride: Extract every Nth turn backwards from the last (1..64).
+            user_id: Opaque identifier stored in your usage metadata for dashboard
+                analytics (1..256 chars). Never forwarded to the model host.
+            session_id: As ``user_id``.
+            agent_id: As ``user_id``.
 
         Returns:
-            OcularResponse with top-level ``salience``, ``subject``, ``imminence``,
-            ``fiction``, ``authenticity``; ``signals`` (per-axis level + score);
-            ``stability`` (when multi-variant); ``meta`` (model version, inference
-            time); and ``trajectory`` (per-turn salience when ≥2 turns).
+            OcularResponse; in demo mode an ``OcularDemoResponse`` that adds
+            ``heads`` and ``detail`` keyed by public family head names. The demo
+            route ignores ``thoroughness`` and the identity fields.
 
         Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
+            ValueError: Neither or both inputs, a bad role, ``trajectory_stride``
+                outside 1..64, or an identity field outside 1..256 characters.
+            NopeFeatureError: Ocular is not enabled for this account.
             NopeServerError: Upstream gateway error.
-            NopeConnectionError: Connection failed.
 
         Example:
             ```python
             result = client.ocular(
-                messages=[{"role": "user", "content": "I feel hopeless"}]
+                messages=[{"role": "user", "content": "I feel hopeless"}],
+                per_turn=True,
             )
             print(result.salience, result.subject)
-            # 0.42 self
-            if result.signals.user.get("suicide", None) and \
-               result.signals.user["suicide"].score > 0.5:
+            if result.signals.user["suicide"].score > 0.5:
                 escalate(...)
+            for turn in result.trajectory or []:
+                print(turn.turn, turn.salience, turn.signals_by_axis)
             ```
 
         Note:
-            Currently free (beta). Rate-limited via the standard /v1/* limiter.
+            ``meta.windowed`` and ``meta.windows`` are always present on the
+            current build (``false`` and ``1`` for un-windowed input).
         """
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        payload: Dict[str, Any] = {}
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-        if text is not None:
-            payload["text"] = text
-        if thoroughness is not None:
-            payload["thoroughness"] = thoroughness
-
-        response = self._request("POST", "/v1/ocular", json=payload)
+        path, payload = build_ocular_request(
+            messages=messages,
+            text=text,
+            thoroughness=thoroughness,
+            per_turn=per_turn,
+            trajectory_stride=trajectory_stride,
+            user_id=user_id,
+            session_id=session_id,
+            agent_id=agent_id,
+            demo=self.demo,
+        )
+        response = self._request("POST", path, json=payload)
+        if self.demo:
+            return OcularDemoResponse.model_validate(response)
         return OcularResponse.model_validate(response)
 
     def oversight_analyze(
@@ -1023,28 +1035,31 @@ class AsyncNopeClient:
         messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
+        per_turn: Optional[bool] = None,
+        trajectory_stride: Optional[int] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> OcularResponse:
         """
         Behavioral risk assessment via Ocular (async).
 
         See NopeClient.ocular for full documentation.
         """
-        if messages is None and text is None:
-            raise ValueError("Either 'messages' or 'text' must be provided")
-        if messages is not None and text is not None:
-            raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
-
-        payload: Dict[str, Any] = {}
-        if messages is not None:
-            payload["messages"] = [
-                m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
-            ]
-        if text is not None:
-            payload["text"] = text
-        if thoroughness is not None:
-            payload["thoroughness"] = thoroughness
-
-        response = await self._request("POST", "/v1/ocular", json=payload)
+        path, payload = build_ocular_request(
+            messages=messages,
+            text=text,
+            thoroughness=thoroughness,
+            per_turn=per_turn,
+            trajectory_stride=trajectory_stride,
+            user_id=user_id,
+            session_id=session_id,
+            agent_id=agent_id,
+            demo=self.demo,
+        )
+        response = await self._request("POST", path, json=payload)
+        if self.demo:
+            return OcularDemoResponse.model_validate(response)
         return OcularResponse.model_validate(response)
 
     async def oversight_analyze(

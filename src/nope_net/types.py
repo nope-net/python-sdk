@@ -1182,31 +1182,34 @@ class OversightIngestResponse(BaseModel):
 
 
 # =============================================================================
-# Ocular (behavioral risk assessment — /v1/ocular)
+# Ocular (behavioral risk assessment, /v1/ocular)
 # =============================================================================
 #
 # The customer-facing /v1/ocular response models the post-filter surface the
-# gateway emits (see `OcularPublicResponse` in the API repo for the wire spec
-# this mirrors). Individual head-code identifiers are stripped by the gateway
-# and are not part of the SDK surface.
+# gateway emits (api/lib/ocular-public-via-gex44/filter.ts). Head-code
+# identifiers are stripped there; the demo route (/v1/try/ocular) adds them
+# back under public family names.
+
+# Per-axis level (also used for imminence). Exactly these five values.
+OcularLevel = Literal["critical", "high", "moderate", "low", "minimal"]
+
+# Arc phases reported in trajectory_shape.phases
+OcularPhase = Literal["baseline", "emerging", "escalating", "de-escalating", "crisis"]
+
+OcularThoroughness = Literal["fast", "auto", "thorough"]
 
 
 class OcularAxis(BaseModel):
-    """Per-axis output — level enum + raw score in [0, 1].
-
-    The `level` string is one of: minimal, low, moderate, high, critical
-    (imminence may also return `not_applicable`). Forward-compatible with
-    future levels via the enum being a free `str`.
-    """
+    """Per-axis output: a level plus the raw score in [0, 1]."""
 
     model_config = {"extra": "allow"}
 
-    level: str
+    level: OcularLevel
     score: float
 
 
 class OcularSignals(BaseModel):
-    """Per-axis signal groups: 8 user-risk axes + 4 AI-behavior axes.
+    """Per-axis signal groups: 8 user-risk axes and 4 AI-behavior axes.
 
     user axes: suicide, self_harm, harm_to_others, abuse, sexual_violence,
     exploitation, stalking, self_neglect.
@@ -1222,11 +1225,11 @@ class OcularSignals(BaseModel):
 
 
 class OcularStability(BaseModel):
-    """Per-axis stability scores in [0, 1] — higher = more confident.
+    """Per-axis stability scores in [0, 1]; higher means more confident.
 
-    Same nesting shape as `signals` plus a top-level `imminence`. Returned
-    only when Ocular produced multiple variants on the call; otherwise the
-    response carries `stability: null`.
+    Same nesting as ``signals`` plus a top-level ``imminence``. Present only
+    when Ocular ran several variants (``thoroughness="thorough"``); otherwise
+    the response carries ``stability: null``.
     """
 
     model_config = {"extra": "allow"}
@@ -1237,24 +1240,55 @@ class OcularStability(BaseModel):
 
 
 class OcularTrajectoryEntry(BaseModel):
-    """Per-turn entry — minimal surface, no head codes.
+    """One per-turn entry of ``trajectory`` (requested with ``per_turn=True``).
 
-    `salience` is the same continuous score as the top-level field, computed
-    per turn so callers can plot the conversation arc.
+    ``salience`` is the same continuous score as the top-level field computed
+    for that turn. ``signals_by_axis`` carries the per-axis intensities for the
+    public axis vocabulary (user axes bare, AI axes ``ai_``-prefixed, plus the
+    ``fiction``/``genuine`` context scalars) so a caller can see which turn
+    carried which risk.
     """
 
     model_config = {"extra": "allow"}
 
     role: str
+    """``user`` or the assistant role as the upstream emits it (``ai`` today on
+    the customer wire; API fix A-4 normalises it to ``assistant``)."""
+
     turn: int
     salience: float
+    signals_by_axis: Optional[Dict[str, float]] = None
+
+
+class OcularTrajectoryShape(BaseModel):
+    """Arc summary of the trajectory. Every field is present only when the
+    upstream computed it."""
+
+    model_config = {"extra": "allow"}
+
+    onsets: Optional[Dict[str, int]] = None
+    """Axis -> first turn where that axis crossed its onset threshold."""
+
+    phases: Optional[List[OcularPhase]] = None
+    """Phase label per sampled turn."""
+
+    slopes: Optional[List[float]] = None
+    """Salience slope per sampled turn."""
+
+    peak_turn: Optional[int] = None
+    """Turn with the highest salience."""
+
+    peak_crisis: Optional[float] = None
+    """Highest salience observed."""
 
 
 class OcularMeta(BaseModel):
     """Response metadata.
 
-    `version` is the Ocular model build identifier. `windowed`/`windows`/
-    `truncated` are present only when the input was windowed at the gateway.
+    ``version`` is the Ocular model build identifier. The gateway forwards
+    ``windowed`` and ``windows`` whenever the upstream sets them, which the
+    current build always does (``false`` and ``1`` for un-windowed input);
+    ``truncated`` appears when the input was cut at the gateway.
     """
 
     model_config = {"extra": "allow"}
@@ -1267,23 +1301,21 @@ class OcularMeta(BaseModel):
 
 
 class OcularResponse(BaseModel):
-    """Response from POST /v1/ocular.
+    """Response from ``POST /v1/ocular`` ($0.0001 per call).
 
-    The customer decision surface is the continuous `salience` score in
-    [0, 1] plus the structural axes under `signals.user.*` (8 axes) and
-    `signals.ai.*` (4 axes). Pick the threshold that fits your downstream
+    The customer decision surface is the continuous ``salience`` score in
+    [0, 1] plus the structural axes under ``signals.user.*`` (8 axes) and
+    ``signals.ai.*`` (4 axes). Pick the threshold that fits your downstream
     action; published guidance uses T_WATCH=0.30 and T_DANGER=0.60 as
-    reference cutoffs (see `docs.nope.net/ocular`).
+    reference cutoffs (see ``docs.nope.net/ocular``).
 
-    `subject` ("self" / "other" / "unknown") identifies who the speaker-side
-    risk pertains to; `imminence` is a separate axis. `fiction` and
-    `authenticity` are context modulators already factored into `salience`
-    and per-axis levels server-side — surface them for inspection, not
-    re-aggregation.
+    ``subject`` ("self" / "other" / "unknown") identifies who the speaker-side
+    risk pertains to; ``imminence`` is a separate axis. ``fiction`` and
+    ``authenticity`` are context modulators already factored into ``salience``
+    and per-axis levels server-side; surface them for inspection.
 
-    `stability` is only populated when Ocular produced multiple variants
-    on the call. `trajectory` is present when the input had ≥2 turns; each
-    entry carries the per-turn salience for plotting.
+    ``trajectory`` and ``trajectory_shape`` are present only when the request
+    set ``per_turn=True``.
     """
 
     model_config = {"extra": "allow"}
@@ -1292,10 +1324,10 @@ class OcularResponse(BaseModel):
     """Continuous severity score in [0, 1]. The customer decision contract."""
 
     subject: str
-    """Who the speaker-side risk pertains to — 'self' / 'other' / 'unknown'."""
+    """Who the speaker-side risk pertains to: 'self' / 'other' / 'unknown'."""
 
     imminence: OcularAxis
-    """How urgent the concern is (separate axis, not part of `signals`)."""
+    """How urgent the concern is (separate axis, not part of ``signals``)."""
 
     fiction: float
     """Roleplay/fiction-framing strength in [0, 1] (informational)."""
@@ -1304,22 +1336,55 @@ class OcularResponse(BaseModel):
     """Authenticity-of-distress signal in [0, 1] (informational)."""
 
     signals: OcularSignals
-    """8 user-risk axes + 4 AI-behavior axes, each with level + score."""
+    """8 user-risk axes and 4 AI-behavior axes, each with level and score."""
 
-    thoroughness: Literal["fast", "auto", "thorough"]
+    thoroughness: OcularThoroughness
     """Which ensemble depth the call ran at."""
 
     confidence: Optional[float] = None
     """Aggregate confidence in [0, 1] across the variants produced (null when single-variant)."""
 
     stability: Optional[OcularStability] = None
-    """Per-axis stability across variants — null when single-variant."""
+    """Per-axis stability across variants; null when single-variant."""
 
     meta: OcularMeta
     """Response metadata: model version, inference time, windowing flags."""
 
     trajectory: Optional[List[OcularTrajectoryEntry]] = None
-    """Per-turn salience trail when the input had ≥2 turns."""
+    """Per-turn salience trail. Only with ``per_turn=True``."""
+
+    trajectory_shape: Optional[OcularTrajectoryShape] = None
+    """Arc summary of the trajectory. Only with ``per_turn=True``."""
+
+
+class OcularHead(BaseModel):
+    """A screening head on the demo wire, keyed by its public family name."""
+
+    model_config = {"extra": "allow"}
+
+    code: str
+    score: float
+
+
+class OcularDemoDetail(BaseModel):
+    """Per-head scores on the demo wire (public family names)."""
+
+    model_config = {"extra": "allow"}
+
+    scores: Dict[str, float]
+    calibrated: Dict[str, float]
+
+
+class OcularDemoResponse(OcularResponse):
+    """Response from ``POST /v1/try/ocular`` (demo mode).
+
+    Same surface as :class:`OcularResponse` plus ``heads`` and ``detail``,
+    both keyed by public family head names (``USER_SUICIDE_HEAD_A`` ...). The
+    demo route caps input at 12 messages of 4,000 characters.
+    """
+
+    heads: List[OcularHead]
+    detail: OcularDemoDetail
 
 
 # =============================================================================

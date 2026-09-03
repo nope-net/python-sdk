@@ -30,7 +30,7 @@ FIXTURE_MODELS: Dict[str, str] = {
     "oversight/try.fast.json": "OversightDemoAnalyzeResponse",
     "oversight/try.full.json": "OversightDemoAnalyzeResponse",
     "ocular/auth.json": "OcularResponse",
-    "ocular/try.json": "OcularResponse",
+    "ocular/try.json": "OcularDemoResponse",
     "signpost/auth.gb.json": "ResourcesResponse",
     "signpost/countries.json": "ResourcesCountriesResponse",
     "signpost/detect-country.miss.json": "DetectCountryResponse",

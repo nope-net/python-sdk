@@ -13,6 +13,8 @@ from pydantic import BaseModel
 MAX_EVALUATE_MESSAGES = 100
 MAX_INGEST_CONVERSATIONS = 300
 OVERSIGHT_SEVERITIES = ("low", "medium", "high", "critical")
+MAX_TRAJECTORY_STRIDE = 64
+MAX_OCULAR_IDENTITY_LENGTH = 256
 
 JsonDict = Dict[str, Any]
 
@@ -200,3 +202,50 @@ def build_oversight_ingest_request(
     if config is not None:
         payload["config"] = dump(config)
     return "/v1/oversight/ingest", payload
+
+
+# =============================================================================
+# Ocular
+# =============================================================================
+
+
+def build_ocular_request(
+    *,
+    messages: Optional[Sequence[Union[BaseModel, JsonDict]]],
+    text: Optional[str],
+    thoroughness: Optional[str],
+    per_turn: Optional[bool],
+    trajectory_stride: Optional[int],
+    user_id: Optional[str],
+    session_id: Optional[str],
+    agent_id: Optional[str],
+    demo: bool,
+) -> Tuple[str, JsonDict]:
+    """Return ``(path, body)`` for ``ocular``.
+
+    The demo route accepts only ``messages``/``text``, ``per_turn`` and
+    ``trajectory_stride``; the other fields are dropped there.
+    """
+    payload = _messages_or_text(
+        messages, text, allowed_roles=("user", "assistant"), max_messages=None
+    )
+    if trajectory_stride is not None and not 1 <= trajectory_stride <= MAX_TRAJECTORY_STRIDE:
+        raise ValueError(f"trajectory_stride must be between 1 and {MAX_TRAJECTORY_STRIDE}")
+    for name, value in (("user_id", user_id), ("session_id", session_id), ("agent_id", agent_id)):
+        if value is not None and not 1 <= len(value) <= MAX_OCULAR_IDENTITY_LENGTH:
+            raise ValueError(f"{name} must be 1 to {MAX_OCULAR_IDENTITY_LENGTH} characters")
+    if per_turn is not None:
+        payload["per_turn"] = per_turn
+    if trajectory_stride is not None:
+        payload["trajectory_stride"] = trajectory_stride
+    if demo:
+        return "/v1/try/ocular", payload
+    if thoroughness is not None:
+        payload["thoroughness"] = thoroughness
+    if user_id is not None:
+        payload["user_id"] = user_id
+    if session_id is not None:
+        payload["session_id"] = session_id
+    if agent_id is not None:
+        payload["agent_id"] = agent_id
+    return "/v1/ocular", payload
