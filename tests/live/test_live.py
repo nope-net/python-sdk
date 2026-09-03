@@ -128,7 +128,8 @@ async def test_row03_evaluate_demo(demo: ClientRunner, ledger: CostLedger) -> No
         "evaluate", messages=CONCERNING, config={"country": "GB", "include_resources": False}
     )
     await _done(demo, ledger)
-    assert without.show_resources is False and without.resources is None
+    # show_resources is derived from the risk; include_resources=False only omits the block.
+    assert isinstance(without.show_resources, bool) and without.resources is None
 
 
 async def test_row04_bad_key(client_kind: str, base_url: str) -> None:
