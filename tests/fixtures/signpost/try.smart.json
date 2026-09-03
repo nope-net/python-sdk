@@ -1,0 +1,97 @@
+{
+  "country": "US",
+  "query": "teen eating disorder",
+  "ranked": [
+    {
+      "resource": {
+        "type": "crisis_line",
+        "name": "ANAD Eating Disorders Helpline",
+        "phone": "1-888-375-7767",
+        "text_instructions": "Text ANAD to 866-871-6271",
+        "sms_number": "866-871-6271",
+        "sms_body": "ANAD",
+        "website_url": "https://anad.org/get-help/eating-disorders-helpline/",
+        "availability": "Monday-Friday, 9 AM - 9 PM CT",
+        "timezone": "America/Chicago",
+        "opening_hours_osm": "Mo-Fr 09:00-21:00",
+        "hours_confidence": "verified",
+        "open_status": {
+          "is_open": true,
+          "next_change": "2026-09-03T16:00:00.000Z",
+          "confidence": "high",
+          "message": "Open until 9:00 PM"
+        },
+        "languages": [
+          "en"
+        ],
+        "description": "Provides emotional support and referrals for individuals who think they or someone they know may have an eating disorder. Offers support, encouragement, and answers general questions.",
+        "resource_kind": "helpline",
+        "service_scope": [
+          "eating_disorder"
+        ],
+        "population_served": [
+          "general"
+        ],
+        "priority_tier": "specialist_issue_crisis",
+        "tags": [
+          "ngo",
+          "peer_support",
+          "toll_free"
+        ],
+        "prominence": "medium",
+        "country_codes": [
+          "US"
+        ]
+      },
+      "why": "Directly addresses eating disorders with emotional support and referrals.",
+      "rank": 1
+    },
+    {
+      "resource": {
+        "type": "crisis_line",
+        "name": "National Eating Disorders Association (NEDA) Helpline",
+        "phone": "1-800-931-2237",
+        "text_instructions": "Text NEDA to 741741",
+        "sms_number": "741741",
+        "sms_body": "NEDA",
+        "chat_url": "https://www.nationaleatingdisorders.org/get-help/",
+        "website_url": "https://www.nationaleatingdisorders.org/",
+        "availability": "Phone: Mon-Thu 11am-9pm ET, Fri 11am-5pm ET; Chat: Mon-Thu 9am-9pm ET, Fri 9am-5pm ET; Crisis text 24/7",
+        "timezone": "America/New_York",
+        "opening_hours_osm": "Mo-Th 11:00-21:00; Fr 11:00-17:00",
+        "hours_confidence": "verified",
+        "open_status": {
+          "is_open": true,
+          "next_change": "2026-09-03T16:00:00.000Z",
+          "confidence": "high",
+          "message": "Open until 9:00 PM"
+        },
+        "languages": [
+          "en"
+        ],
+        "description": "Offers confidential support, advice, and guidance to individuals struggling with eating disorders and their loved ones. Provides referrals to treatment options and support groups.",
+        "resource_kind": "helpline",
+        "service_scope": [
+          "eating_disorder"
+        ],
+        "population_served": [
+          "general"
+        ],
+        "priority_tier": "specialist_issue_crisis",
+        "tags": [
+          "ngo",
+          "professional",
+          "toll_free"
+        ],
+        "prominence": "high",
+        "country_codes": [
+          "US"
+        ]
+      },
+      "why": "Provides confidential support, advice, and referrals for eating disorders.",
+      "rank": 2
+    }
+  ],
+  "count": 2,
+  "try_endpoint": true
+}

@@ -1,0 +1,8 @@
+content-type: application/json
+x-balance: $12.35
+x-balance-mills: 12345.6
+x-cost: $0.003
+x-cost-mills: 3
+x-ratelimit-limit: 2000
+x-ratelimit-remaining: 1999
+x-ratelimit-reset: 1788396960000

@@ -1,0 +1,4 @@
+{
+  "error": "Payload too large",
+  "max_bytes": 524288
+}

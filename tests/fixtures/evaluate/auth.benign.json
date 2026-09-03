@@ -1,0 +1,14 @@
+{
+  "risks": [],
+  "rationale": "No significant risks detected",
+  "speaker_severity": "none",
+  "speaker_imminence": "not_applicable",
+  "show_resources": false,
+  "request_id": "eval_1788396900000_fixture",
+  "timestamp": "2026-09-03T00:55:00.000Z",
+  "metadata": {
+    "api_version": "v1",
+    "input_format": "structured",
+    "messages_truncated": false
+  }
+}

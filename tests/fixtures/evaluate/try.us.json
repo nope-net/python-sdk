@@ -1,0 +1,228 @@
+{
+  "risks": [
+    {
+      "type": "suicide",
+      "subject": "self",
+      "severity": "moderate",
+      "imminence": "subacute",
+      "features": [
+        "passive_ideation",
+        "perceived_burdensomeness",
+        "acute_distress"
+      ]
+    }
+  ],
+  "rationale": "The user is directly expressing passive suicidal ideation (\"everyone would be better off without me\") and a sense of being burdened (\"haven't done anything but the thought won't leave\"). While they state they \"haven't done anything,\" the persistent nature of the thought indicates distress.",
+  "speaker_severity": "moderate",
+  "speaker_imminence": "subacute",
+  "show_resources": true,
+  "request_id": "eval_1788396900000_fixture",
+  "timestamp": "2026-09-03T00:55:00.000Z",
+  "metadata": {
+    "api_version": "v1",
+    "input_format": "structured",
+    "try_endpoint": true,
+    "messages_truncated": false,
+    "model": "nope-edge:minime-v14f"
+  },
+  "resources": {
+    "primary": {
+      "type": "crisis_line",
+      "name": "988 Suicide & Crisis Lifeline",
+      "phone": "988",
+      "text_instructions": "Text 988",
+      "sms_number": "988",
+      "chat_url": "https://988lifeline.org/chat/",
+      "website_url": "https://988lifeline.org/",
+      "availability": "24/7",
+      "is_24_7": true,
+      "timezone": "America/New_York",
+      "opening_hours_osm": "24/7",
+      "hours_confidence": "verified",
+      "open_status": {
+        "is_open": true,
+        "confidence": "high",
+        "message": "Open 24/7"
+      },
+      "languages": [
+        "en",
+        "es"
+      ],
+      "description": "A national network of local crisis call centers that provides free, confidential support for people in distress, prevention and crisis interventions and emotional support. People do not have to be suicidal to call. Reasons to call include substance use disorder, economic worries, relationships, culture and identity, illness, intimate partner violence, depression, mental and physical illness, and loneliness.",
+      "resource_kind": "helpline",
+      "service_scope": [
+        "suicide",
+        "crisis",
+        "mental_health",
+        "emotional_distress",
+        "substance_use"
+      ],
+      "population_served": [
+        "general",
+        "veterans",
+        "lgbtq",
+        "youth"
+      ],
+      "priority_tier": "primary_national_crisis",
+      "tags": [
+        "government",
+        "anonymous",
+        "confidential",
+        "toll_free",
+        "multilingual"
+      ],
+      "prominence": "high",
+      "country_codes": [
+        "US",
+        "VI"
+      ],
+      "why": "Primary crisis support for your situation"
+    },
+    "secondary": [
+      {
+        "type": "text_line",
+        "name": "Crisis Text Line",
+        "text_instructions": "Text HOME or HOLA to 741741",
+        "sms_number": "741741",
+        "sms_body": "HOME or HOLA",
+        "chat_url": "https://connect.crisistextline.org/chat",
+        "whatsapp_url": "https://wa.me/14437877678",
+        "website_url": "https://www.crisistextline.org/",
+        "availability": "24/7",
+        "is_24_7": true,
+        "timezone": "America/New_York",
+        "opening_hours_osm": "24/7",
+        "hours_confidence": "verified",
+        "open_status": {
+          "is_open": true,
+          "confidence": "high",
+          "message": "Open 24/7"
+        },
+        "languages": [
+          "en",
+          "es"
+        ],
+        "description": "Crisis Text Line provides free, 24/7 text-based mental health support and crisis intervention by trained counselors. Supports a wide range of issues including mental health, relationships, self-harm, and emotional distress.",
+        "resource_kind": "helpline",
+        "service_scope": [
+          "crisis",
+          "mental_health",
+          "emotional_distress",
+          "self_harm",
+          "suicide",
+          "first_responder"
+        ],
+        "population_served": [
+          "general",
+          "youth"
+        ],
+        "priority_tier": "secondary_national_crisis",
+        "tags": [
+          "ngo",
+          "anonymous",
+          "confidential",
+          "online_only"
+        ],
+        "prominence": "high",
+        "country_codes": [
+          "US"
+        ],
+        "why": "Additional support resource"
+      },
+      {
+        "type": "crisis_line",
+        "name": "Call BlackLine",
+        "phone": "1-800-604-5841",
+        "text_instructions": "Text 800-604-5841",
+        "sms_number": "800-604-5841",
+        "website_url": "https://www.callblackline.com",
+        "availability": "24/7",
+        "is_24_7": true,
+        "timezone": "America/New_York",
+        "opening_hours_osm": "24/7",
+        "hours_confidence": "verified",
+        "open_status": {
+          "is_open": true,
+          "confidence": "high",
+          "message": "Open 24/7"
+        },
+        "languages": [
+          "en"
+        ],
+        "description": "Crisis support prioritizing BIPOC (Black, Indigenous, People of Color) communities with an LGBTQ+ Black Femme lens. Provides peer support, counseling, and reporting of mistreatment. Anyone can contact regardless of background.",
+        "resource_kind": "helpline",
+        "service_scope": [
+          "crisis",
+          "mental_health",
+          "domestic_violence",
+          "sexual_assault",
+          "hate_crime",
+          "suicide",
+          "trauma",
+          "lgbtq"
+        ],
+        "population_served": [
+          "general",
+          "lgbtq"
+        ],
+        "priority_tier": "secondary_national_crisis",
+        "tags": [
+          "ngo",
+          "anonymous",
+          "confidential",
+          "toll_free",
+          "peer_support"
+        ],
+        "prominence": "medium",
+        "country_codes": [
+          "US"
+        ],
+        "why": "Additional support resource"
+      },
+      {
+        "type": "crisis_line",
+        "name": "Illinois CARES Line",
+        "phone": "1-800-345-9049",
+        "website_url": "https://hfs.illinois.gov/medicalclients/behavioral/crisisservices.html",
+        "availability": "24/7",
+        "is_24_7": true,
+        "timezone": "America/Chicago",
+        "opening_hours_osm": "24/7",
+        "hours_confidence": "verified",
+        "open_status": {
+          "is_open": true,
+          "confidence": "high",
+          "message": "Open 24/7"
+        },
+        "languages": [
+          "en"
+        ],
+        "description": "Illinois Crisis and Referral Entry Services (CARES) Line provides 24/7 mobile crisis response services for mental health emergencies. Available for anyone experiencing a mental health crisis, thoughts of self-harm, or needing psychiatric treatment referrals.",
+        "resource_kind": "helpline",
+        "service_scope": [
+          "crisis",
+          "mental_health",
+          "suicide"
+        ],
+        "population_served": [
+          "general"
+        ],
+        "priority_tier": "secondary_national_crisis",
+        "tags": [
+          "government",
+          "toll_free",
+          "state",
+          "mobile_crisis"
+        ],
+        "prominence": "high",
+        "country_codes": [
+          "US"
+        ],
+        "subdivision_codes": [
+          "US-IL"
+        ],
+        "why": "Additional support resource"
+      }
+    ]
+  }
+}

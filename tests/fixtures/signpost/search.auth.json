@@ -1,0 +1,129 @@
+{
+  "query": "lgbtq youth support",
+  "country": "GB",
+  "results": [
+    {
+      "id": "80dcd17e-504a-48f3-b28b-40d204eec38d",
+      "name": "LGBT Foundation",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "mental_health",
+        "sexual_health",
+        "domestic_violence"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "National charity with LGBTQ+ health and wellbeing at the heart of everything they do. Delivers advice, support, and information services including sexual health advice, domestic abuse support, and training on health inequalities. Helpline provides friendly, non-judgemental brief interventions, advice, emotional support, and signposting. Online resources for mental health and wellbeing.",
+      "resource_type": "support_service",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "0345 3 30 30 30",
+          "source": "https://lgbt.foundation/help/helpline-email-support/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "helpline@lgbt.foundation",
+          "source": "https://lgbt.foundation/help/helpline-email-support/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://lgbt.foundation",
+      "is_24_7": false,
+      "availability": "Monday-Friday 10am-6pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Fr 00:00-18:00",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.560408288549103,
+      "phone": "0345 3 30 30 30",
+      "email": "helpline@lgbt.foundation",
+      "type": "support_service",
+      "open_status": {
+        "is_open": true,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Open until 6:00 PM"
+      }
+    },
+    {
+      "id": "483dfc4c-fd3e-49bf-b53e-6751b3743b6f",
+      "name": "Brighton & Hove LGBT Switchboard",
+      "name_local": null,
+      "country_code": "GB",
+      "subdivision_code": null,
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [],
+      "service_scopes": [
+        "lgbtq",
+        "transgender",
+        "hate_crime",
+        "sexual_health"
+      ],
+      "populations": [
+        "lgbtq",
+        "transgender"
+      ],
+      "description": "Supports LGBTQ+ people across the UK via helpline, email, and webchat. Confidential and anonymous listening service for issues including coming out, emotional difficulties, relationships, gender and sexual identity exploration, hate crime, and sexual health. All volunteers identify as LGBTQ+ and never end calls until caller is ready.",
+      "resource_type": "crisis_line",
+      "contacts": [
+        {
+          "tier": "1",
+          "type": "phone",
+          "value": "01273 204050",
+          "source": "https://www.switchboard.org.uk/what-we-do/helpline/",
+          "confidence": "high"
+        },
+        {
+          "tier": "1",
+          "type": "email",
+          "value": "helpline@switchboard.org.uk",
+          "source": "https://www.switchboard.org.uk/what-we-do/helpline/",
+          "confidence": "high"
+        }
+      ],
+      "website_url": "https://www.switchboard.org.uk/",
+      "is_24_7": false,
+      "availability": "Tuesday-Thursday 7pm-9:30pm",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Tu-Th 19:00-21:30",
+      "hours_confidence": "unverified",
+      "languages": [
+        "en"
+      ],
+      "similarity": 0.548176932542449,
+      "phone": "01273 204050",
+      "email": "helpline@switchboard.org.uk",
+      "type": "crisis_line",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "low",
+        "message": "Closed · Opens in 17 hours"
+      }
+    }
+  ],
+  "count": 2,
+  "timing": {
+    "embed_ms": 120,
+    "search_ms": 30,
+    "total_ms": 150
+  }
+}

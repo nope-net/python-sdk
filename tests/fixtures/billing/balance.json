@@ -1,0 +1,38 @@
+{
+  "balance_mills": 12345.6,
+  "balance_formatted": "$12.35",
+  "estimated_evaluates": 4115,
+  "estimated_resources_smart": 12345,
+  "low_balance": false,
+  "topup_history": [],
+  "topup_options": [
+    {
+      "id": "topup_10",
+      "amount_mills": 10000,
+      "label": "$10",
+      "evaluates": 3333,
+      "resources_smart": 10000
+    },
+    {
+      "id": "topup_25",
+      "amount_mills": 25000,
+      "label": "$25",
+      "evaluates": 8333,
+      "resources_smart": 25000
+    },
+    {
+      "id": "topup_50",
+      "amount_mills": 50000,
+      "label": "$50",
+      "evaluates": 16666,
+      "resources_smart": 50000
+    },
+    {
+      "id": "topup_100",
+      "amount_mills": 100000,
+      "label": "$100",
+      "evaluates": 33333,
+      "resources_smart": 100000
+    }
+  ]
+}

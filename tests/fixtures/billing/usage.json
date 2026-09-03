@@ -1,0 +1,29 @@
+{
+  "period_start": "2026-09-01T00:00:00.000Z",
+  "period_end": "2026-09-03T00:55:00.000Z",
+  "total_spend_mills": 123,
+  "total_spend_formatted": "$0.12",
+  "breakdown": [
+    {
+      "endpoint": "oversight_analyze",
+      "calls": 10,
+      "cost_mills": 30,
+      "cost_formatted": "$0.03",
+      "referrals": 0
+    },
+    {
+      "endpoint": "evaluate",
+      "calls": 10,
+      "cost_mills": 30,
+      "cost_formatted": "$0.03",
+      "referrals": 0
+    },
+    {
+      "endpoint": "v0_screen",
+      "calls": 10,
+      "cost_mills": 30,
+      "cost_formatted": "$0.03",
+      "referrals": 0
+    }
+  ]
+}

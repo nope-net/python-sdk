@@ -1,0 +1,141 @@
+{
+  "country": "GB",
+  "resources": [
+    {
+      "type": "crisis_line",
+      "name": "Samaritans",
+      "phone": "116 123",
+      "email": "jo@samaritans.org",
+      "website_url": "https://www.samaritans.org/",
+      "availability": "24/7",
+      "is_24_7": true,
+      "timezone": "Europe/London",
+      "opening_hours_osm": "24/7",
+      "hours_confidence": "verified",
+      "open_status": {
+        "is_open": true,
+        "confidence": "high",
+        "message": "Open 24/7"
+      },
+      "languages": [
+        "en",
+        "cy"
+      ],
+      "description": "Samaritans offers a safe space for anyone to talk any time they like, in their own way – about whatever's getting to them. Trained volunteers listen and won't judge or tell you what to do.",
+      "resource_kind": "helpline",
+      "service_scope": [
+        "crisis",
+        "suicide",
+        "self_harm",
+        "mental_health",
+        "emotional_distress",
+        "loneliness"
+      ],
+      "population_served": [
+        "general"
+      ],
+      "priority_tier": "primary_national_crisis",
+      "tags": [
+        "ngo",
+        "peer_support",
+        "anonymous",
+        "confidential",
+        "toll_free"
+      ],
+      "prominence": "high",
+      "country_codes": [
+        "GB"
+      ]
+    },
+    {
+      "type": "crisis_line",
+      "name": "Lifeline (Northern Ireland)",
+      "phone": "0808 808 8000",
+      "website_url": "https://www.lifelinehelpline.info/",
+      "availability": "24/7",
+      "is_24_7": true,
+      "timezone": "Europe/London",
+      "opening_hours_osm": "24/7",
+      "hours_confidence": "verified",
+      "open_status": {
+        "is_open": true,
+        "confidence": "high",
+        "message": "Open 24/7"
+      },
+      "languages": [
+        "en"
+      ],
+      "description": "Lifeline is Northern Ireland's crisis response helpline for anyone in distress or despair, or concerned about a friend or family member. Trained counsellors provide confidential, non-judgmental listening and support 24/7.",
+      "resource_kind": "helpline",
+      "service_scope": [
+        "crisis",
+        "suicide",
+        "self_harm",
+        "mental_health",
+        "emotional_distress"
+      ],
+      "population_served": [
+        "general"
+      ],
+      "priority_tier": "primary_national_crisis",
+      "tags": [
+        "government",
+        "toll_free",
+        "confidential",
+        "anonymous"
+      ],
+      "prominence": "high",
+      "country_codes": [
+        "GB"
+      ],
+      "subdivision_codes": [
+        "GB-NIR"
+      ]
+    },
+    {
+      "type": "crisis_line",
+      "name": "Campaign Against Living Miserably (CALM)",
+      "phone": "0800 58 58 58",
+      "chat_url": "https://www.thecalmzone.net/help/webchat/",
+      "website_url": "https://www.thecalmzone.net/",
+      "availability": "5pm to midnight, 365 days a year",
+      "timezone": "Europe/London",
+      "opening_hours_osm": "Mo-Su 17:00-24:00",
+      "hours_confidence": "verified",
+      "open_status": {
+        "is_open": false,
+        "next_change": "2026-09-03T16:00:00.000Z",
+        "confidence": "high",
+        "message": "Closed · Opens in 15 hours"
+      },
+      "languages": [
+        "en"
+      ],
+      "description": "CALM offers a helpline and webchat service for anyone struggling with life. Leading a movement against suicide through vital, life-saving support. Free, anonymous, and confidential.",
+      "resource_kind": "helpline",
+      "service_scope": [
+        "crisis",
+        "suicide",
+        "mental_health",
+        "emotional_distress"
+      ],
+      "population_served": [
+        "general",
+        "men"
+      ],
+      "priority_tier": "secondary_national_crisis",
+      "tags": [
+        "ngo",
+        "anonymous",
+        "confidential",
+        "toll_free",
+        "multilingual"
+      ],
+      "prominence": "high",
+      "country_codes": [
+        "GB"
+      ]
+    }
+  ],
+  "count": 3
+}

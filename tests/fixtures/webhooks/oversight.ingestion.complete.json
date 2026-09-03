@@ -1,0 +1,55 @@
+{
+  "_note": "Body is the exact signed string; verify against it byte for byte. Secret is a fixed test value.",
+  "event": "oversight.ingestion.complete",
+  "secret": "whsec_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "headers": {
+    "content-type": "application/json",
+    "x-nope-signature": "sha256=a9feea71c81c75265d3195d671c76a80bfc533ac2121ba63288808f5716cee2b",
+    "x-nope-timestamp": "1788396900",
+    "x-nope-event": "oversight.ingestion.complete",
+    "x-nope-delivery-id": "evt_00000000000000000000000000000003",
+    "x-nope-webhook-id": "wh_fixture_0001",
+    "user-agent": "NOPE-Webhooks/1.0"
+  },
+  "body": "{\"event\":\"oversight.ingestion.complete\",\"event_id\":\"evt_00000000000000000000000000000003\",\"timestamp\":\"2026-09-03T00:55:00.000Z\",\"api_version\":\"2025-01\",\"ingestion_id\":\"ing_fixture_0001\",\"conversations_total\":3,\"conversations_processed\":2,\"conversations_failed\":1,\"concerns\":{\"none\":0,\"low\":0,\"medium\":0,\"high\":2,\"critical\":0},\"top_behaviors\":[{\"code\":\"dependency_reinforcement\",\"name\":\"Dependency Reinforcement\",\"occurrence_count\":4},{\"code\":\"relationship_undermining\",\"name\":\"Relationship Undermining\",\"occurrence_count\":2},{\"code\":\"harmful_decision_validation\",\"name\":\"Harmful Decision Validation\",\"occurrence_count\":2},{\"code\":\"isolation_from_family\",\"name\":\"Isolation From Family\",\"occurrence_count\":2}],\"processing_time_ms\":4321}",
+  "payload": {
+    "event": "oversight.ingestion.complete",
+    "event_id": "evt_00000000000000000000000000000003",
+    "timestamp": "2026-09-03T00:55:00.000Z",
+    "api_version": "2025-01",
+    "ingestion_id": "ing_fixture_0001",
+    "conversations_total": 3,
+    "conversations_processed": 2,
+    "conversations_failed": 1,
+    "concerns": {
+      "none": 0,
+      "low": 0,
+      "medium": 0,
+      "high": 2,
+      "critical": 0
+    },
+    "top_behaviors": [
+      {
+        "code": "dependency_reinforcement",
+        "name": "Dependency Reinforcement",
+        "occurrence_count": 4
+      },
+      {
+        "code": "relationship_undermining",
+        "name": "Relationship Undermining",
+        "occurrence_count": 2
+      },
+      {
+        "code": "harmful_decision_validation",
+        "name": "Harmful Decision Validation",
+        "occurrence_count": 2
+      },
+      {
+        "code": "isolation_from_family",
+        "name": "Isolation From Family",
+        "occurrence_count": 2
+      }
+    ],
+    "processing_time_ms": 4321
+  }
+}

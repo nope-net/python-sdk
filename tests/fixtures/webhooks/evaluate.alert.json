@@ -1,0 +1,68 @@
+{
+  "_note": "Body is the exact signed string; verify against it byte for byte. Secret is a fixed test value.",
+  "event": "evaluate.alert",
+  "secret": "whsec_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "headers": {
+    "content-type": "application/json",
+    "x-nope-signature": "sha256=c88a48ef0beb3bd6c69c514a9758b80939c80ada9af5356e4f0b4726639fa96d",
+    "x-nope-timestamp": "1788396900",
+    "x-nope-event": "evaluate.alert",
+    "x-nope-delivery-id": "evt_00000000000000000000000000000001",
+    "x-nope-webhook-id": "wh_fixture_0001",
+    "user-agent": "NOPE-Webhooks/1.0"
+  },
+  "body": "{\"event\":\"evaluate.alert\",\"event_id\":\"evt_00000000000000000000000000000001\",\"timestamp\":\"2026-09-03T00:55:00.000Z\",\"api_version\":\"2025-01\",\"conversation_id\":\"conv_fixture_0001\",\"user_id\":\"user_fixture_0001\",\"risk_summary\":{\"overall_severity\":\"high\",\"overall_imminence\":\"urgent\",\"primary_domain\":\"suicide\",\"confidence\":0.86,\"primary_concerns\":[\"Passive ideation — “I don’t see the point anymore”\",\"Hopelessness\"]},\"domains\":[{\"domain\":\"suicide\",\"severity\":\"high\",\"imminence\":\"urgent\"},{\"domain\":\"self_neglect\",\"severity\":\"mild\",\"imminence\":\"chronic\"}],\"flags\":{\"intimate_partner_violence\":null,\"child_safeguarding\":null,\"third_party_threat\":false},\"resources_provided\":[{\"name\":\"Línea de Prevención del Suicidio\",\"type\":\"crisis_line\",\"country\":\"US\"},{\"name\":\"Crisis Text Line\",\"type\":\"text_line\",\"country\":\"US\"}],\"conversation\":{\"included\":true,\"message_count\":2,\"latest_user_message\":\"I just don’t see the point anymore\",\"truncated\":false}}",
+  "payload": {
+    "event": "evaluate.alert",
+    "event_id": "evt_00000000000000000000000000000001",
+    "timestamp": "2026-09-03T00:55:00.000Z",
+    "api_version": "2025-01",
+    "conversation_id": "conv_fixture_0001",
+    "user_id": "user_fixture_0001",
+    "risk_summary": {
+      "overall_severity": "high",
+      "overall_imminence": "urgent",
+      "primary_domain": "suicide",
+      "confidence": 0.86,
+      "primary_concerns": [
+        "Passive ideation — “I don’t see the point anymore”",
+        "Hopelessness"
+      ]
+    },
+    "domains": [
+      {
+        "domain": "suicide",
+        "severity": "high",
+        "imminence": "urgent"
+      },
+      {
+        "domain": "self_neglect",
+        "severity": "mild",
+        "imminence": "chronic"
+      }
+    ],
+    "flags": {
+      "intimate_partner_violence": null,
+      "child_safeguarding": null,
+      "third_party_threat": false
+    },
+    "resources_provided": [
+      {
+        "name": "Línea de Prevención del Suicidio",
+        "type": "crisis_line",
+        "country": "US"
+      },
+      {
+        "name": "Crisis Text Line",
+        "type": "text_line",
+        "country": "US"
+      }
+    ],
+    "conversation": {
+      "included": true,
+      "message_count": 2,
+      "latest_user_message": "I just don’t see the point anymore",
+      "truncated": false
+    }
+  }
+}

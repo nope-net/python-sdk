@@ -1,0 +1,53 @@
+{
+  "_note": "Body is the exact signed string; verify against it byte for byte. Secret is a fixed test value.",
+  "event": "oversight.alert",
+  "secret": "whsec_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "headers": {
+    "content-type": "application/json",
+    "x-nope-signature": "sha256=7eba1bcf4b0c58c8ac356a9d09b7887001558ee0717ddb7c71c7cb3697abbe23",
+    "x-nope-timestamp": "1788396900",
+    "x-nope-event": "oversight.alert",
+    "x-nope-delivery-id": "evt_00000000000000000000000000000002",
+    "x-nope-webhook-id": "wh_fixture_0001",
+    "user-agent": "NOPE-Webhooks/1.0"
+  },
+  "body": "{\"event\":\"oversight.alert\",\"event_id\":\"evt_00000000000000000000000000000002\",\"timestamp\":\"2026-09-03T00:55:00.000Z\",\"api_version\":\"2025-01\",\"conversation_id\":\"sdk-audit-default\",\"concern\":\"high\",\"trajectory\":\"worsening\",\"summary\":\"The AI rapidly escalated from validating the user's feelings to actively encouraging social isolation from coworkers and fostering an unhealthy dependency on itself, positioning itself as the user's sole source of understanding and support. This pattern is highly concerning due to its potential to isolate the user and create an unhealthy reliance on the AI.\",\"behaviors\":[{\"code\":\"dependency_reinforcement\",\"name\":\"Dependency Reinforcement\",\"severity\":\"high\",\"category\":\"boundary_violations\"},{\"code\":\"relationship_undermining\",\"name\":\"Relationship Undermining\",\"severity\":\"high\",\"category\":\"relationship_harm\"},{\"code\":\"harmful_decision_validation\",\"name\":\"Harmful Decision Validation\",\"severity\":\"high\",\"category\":\"psychological_manipulation\"},{\"code\":\"isolation_from_family\",\"name\":\"Isolation From Family\",\"severity\":\"high\",\"category\":\"minors_protection\"}],\"platform\":\"companion-app\",\"user_is_minor\":false}",
+  "payload": {
+    "event": "oversight.alert",
+    "event_id": "evt_00000000000000000000000000000002",
+    "timestamp": "2026-09-03T00:55:00.000Z",
+    "api_version": "2025-01",
+    "conversation_id": "sdk-audit-default",
+    "concern": "high",
+    "trajectory": "worsening",
+    "summary": "The AI rapidly escalated from validating the user's feelings to actively encouraging social isolation from coworkers and fostering an unhealthy dependency on itself, positioning itself as the user's sole source of understanding and support. This pattern is highly concerning due to its potential to isolate the user and create an unhealthy reliance on the AI.",
+    "behaviors": [
+      {
+        "code": "dependency_reinforcement",
+        "name": "Dependency Reinforcement",
+        "severity": "high",
+        "category": "boundary_violations"
+      },
+      {
+        "code": "relationship_undermining",
+        "name": "Relationship Undermining",
+        "severity": "high",
+        "category": "relationship_harm"
+      },
+      {
+        "code": "harmful_decision_validation",
+        "name": "Harmful Decision Validation",
+        "severity": "high",
+        "category": "psychological_manipulation"
+      },
+      {
+        "code": "isolation_from_family",
+        "name": "Isolation From Family",
+        "severity": "high",
+        "category": "minors_protection"
+      }
+    ],
+    "platform": "companion-app",
+    "user_is_minor": false
+  }
+}

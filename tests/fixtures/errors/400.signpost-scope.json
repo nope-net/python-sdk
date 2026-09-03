@@ -1,0 +1,7 @@
+{
+  "error": "Invalid scope(s): suicide_prevention",
+  "hint": "See docs.nope.net for valid scope values",
+  "invalid_scopes": [
+    "suicide_prevention"
+  ]
+}
