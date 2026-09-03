@@ -29,12 +29,11 @@ import hashlib
 import hmac
 import json
 import time
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel
 
-from .types import Severity, Imminence
-
+from .types import Imminence, Severity
 
 # =============================================================================
 # Webhook Types
@@ -149,7 +148,7 @@ class Webhook:
 
     @staticmethod
     def verify(
-        payload: Union[str, bytes, dict],
+        payload: Union[str, bytes, Dict[str, Any]],
         signature: Optional[str],
         timestamp: Optional[str],
         secret: str,
@@ -242,10 +241,10 @@ class Webhook:
 
     @staticmethod
     def sign(
-        payload: Union[str, bytes, dict],
+        payload: Union[str, bytes, Dict[str, Any]],
         secret: str,
         timestamp: Optional[int] = None,
-    ) -> dict:
+    ) -> Dict[str, str]:
         """
         Generate a signature for testing purposes.
 
@@ -275,9 +274,7 @@ class Webhook:
             payload_string = payload
 
         message = f"{ts}.{payload_string}"
-        sig = hmac.new(
-            secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
+        sig = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
 
         return {
             "signature": f"sha256={sig}",

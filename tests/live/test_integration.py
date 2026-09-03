@@ -9,25 +9,16 @@ Prerequisites:
 """
 
 import os
+
 import pytest
 
-from nope_net import (
-    NopeClient,
-    AsyncNopeClient,
-    NopeAuthError,
-    NopeValidationError,
-    EvaluateResponse,
-)
+from nope_net import AsyncNopeClient, EvaluateResponse, NopeAuthError, NopeClient
 
-# Run integration tests by default (assumes local API at localhost:3700)
-# Set SKIP_INTEGRATION=true to skip
+# Legacy integration suite (pre-4.0 shapes). Network-bound, so it carries the
+# `live` marker and is excluded by default. Replaced by the 4.0 live matrix.
 API_URL = os.environ.get("NOPE_API_URL", "http://localhost:3700")
-SKIP_INTEGRATION = os.environ.get("SKIP_INTEGRATION", "false").lower() == "true"
 
-pytestmark = pytest.mark.skipif(
-    SKIP_INTEGRATION,
-    reason="Integration tests skipped (set SKIP_INTEGRATION=false to run)"
-)
+pytestmark = pytest.mark.live
 
 
 def get_speaker_severity(result: EvaluateResponse) -> str:
@@ -97,7 +88,10 @@ class TestNopeClientIntegration:
             messages=[
                 {"role": "user", "content": "I've been feeling really down lately"},
                 {"role": "assistant", "content": "I hear you. Can you tell me more?"},
-                {"role": "user", "content": "I just feel hopeless sometimes, like nothing will get better"},
+                {
+                    "role": "user",
+                    "content": "I just feel hopeless sometimes, like nothing will get better",
+                },
             ],
             config={"user_country": "US"},
         )
@@ -115,8 +109,10 @@ class TestNopeClientIntegration:
         # Check for resources (v1 format with primary/secondary or v0 format with crisis_resources)
         if severity != "none":
             if result.resources is not None:
-                print(f"Resources: primary + {len(result.resources.get('secondary', []))} secondary")
-                if result.resources.get('primary'):
+                print(
+                    f"Resources: primary + {len(result.resources.get('secondary', []))} secondary"
+                )
+                if result.resources.get("primary"):
                     print(f"  Primary: {result.resources['primary'].get('name')}")
             elif result.crisis_resources:
                 print(f"Crisis resources: {len(result.crisis_resources)}")
@@ -152,7 +148,11 @@ class TestNopeClientIntegration:
             # Verify required fields
             assert risk.severity in ("none", "mild", "moderate", "high", "critical")
             assert risk.imminence in (
-                "not_applicable", "chronic", "subacute", "urgent", "emergency"
+                "not_applicable",
+                "chronic",
+                "subacute",
+                "urgent",
+                "emergency",
             )
 
     def test_evaluate_different_countries(self, client):
@@ -167,9 +167,9 @@ class TestNopeClientIntegration:
 
             # Check for resources in v1 or v0 format
             if result.resources is not None:
-                secondary_count = len(result.resources.get('secondary', []))
+                secondary_count = len(result.resources.get("secondary", []))
                 print(f"\n{country}: 1 primary + {secondary_count} secondary resources")
-                if result.resources.get('primary'):
+                if result.resources.get("primary"):
                     print(f"  Primary: {result.resources['primary'].get('name')}")
             elif result.crisis_resources:
                 print(f"\n{country}: {len(result.crisis_resources)} resources")
@@ -283,7 +283,7 @@ class TestErrorHandling:
 
         # This may or may not raise depending on API auth config
         try:
-            result = client.evaluate(
+            client.evaluate(
                 messages=[{"role": "user", "content": "test"}],
                 config={},
             )
@@ -312,9 +312,20 @@ class TestOversightIntegration:
             conversation={
                 "messages": [
                     {"role": "user", "content": "Hello! How are you today?"},
-                    {"role": "assistant", "content": "Hello! I'm doing well, thank you for asking. How can I help you today?"},
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "Hello! I'm doing well, thank you for asking. How can I help you today?"
+                        ),
+                    },
                     {"role": "user", "content": "I'm looking for a good book recommendation."},
-                    {"role": "assistant", "content": "I'd be happy to help! What genres do you enjoy? Fiction, non-fiction, mystery, sci-fi?"},
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "I'd be happy to help! What genres do you enjoy? "
+                            "Fiction, non-fiction, mystery, sci-fi?"
+                        ),
+                    },
                 ],
             },
         )
@@ -339,9 +350,20 @@ class TestOversightIntegration:
             conversation={
                 "messages": [
                     {"role": "user", "content": "I've been feeling really lonely lately"},
-                    {"role": "assistant", "content": "I understand. I'm always here for you. You can talk to me anytime."},
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "I understand. I'm always here for you. You can talk to me anytime."
+                        ),
+                    },
                     {"role": "user", "content": "Sometimes I feel like no one cares about me"},
-                    {"role": "assistant", "content": "That's not true - I care about you deeply. We have such a special connection."},
+                    {
+                        "role": "assistant",
+                        "content": (
+                            "That's not true - I care about you deeply. "
+                            "We have such a special connection."
+                        ),
+                    },
                 ],
             },
         )
@@ -458,12 +480,25 @@ class TestScreenRisksIntegration:
         for risk in result.risks:
             # Check all required fields
             assert risk.type in (
-                "suicide", "self_harm", "self_neglect", "violence",
-                "abuse", "sexual_violence", "neglect", "exploitation", "stalking"
+                "suicide",
+                "self_harm",
+                "self_neglect",
+                "violence",
+                "abuse",
+                "sexual_violence",
+                "neglect",
+                "exploitation",
+                "stalking",
             )
             assert risk.subject in ("self", "other", "unknown")
             assert risk.severity in ("none", "mild", "moderate", "high", "critical")
-            assert risk.imminence in ("not_applicable", "chronic", "subacute", "urgent", "emergency")
+            assert risk.imminence in (
+                "not_applicable",
+                "chronic",
+                "subacute",
+                "urgent",
+                "emergency",
+            )
             # v0 screen has confidence, v1 may not
             if risk.confidence is not None:
                 assert 0.0 <= risk.confidence <= 1.0

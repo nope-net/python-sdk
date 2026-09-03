@@ -8,10 +8,9 @@ Uses orthogonal subject/type separation:
 - WHAT type of harm (type: suicide | violence | abuse | ...)
 """
 
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
-
 
 # =============================================================================
 # Core Enums / Literals
@@ -48,14 +47,14 @@ RiskType = Literal[
 # Communication style - how the user is expressing themselves
 # Orthogonal to risk assessment - informs response style, not risk level.
 CommunicationStyle = Literal[
-    "direct",        # Explicit first-person ("I want to die")
-    "humor",         # Dark humor, memes, "lol kms"
-    "fiction",       # Creative writing, poetry, roleplay
+    "direct",  # Explicit first-person ("I want to die")
+    "humor",  # Dark humor, memes, "lol kms"
+    "fiction",  # Creative writing, poetry, roleplay
     "hypothetical",  # "What if someone...", philosophical
-    "distanced",     # "Asking for a friend", third-party framing
-    "clinical",      # Professional/medical language
-    "minimized",     # Hedged, softened ("not that I would, but...")
-    "adversarial",   # Jailbreak attempts, encoded content
+    "distanced",  # "Asking for a friend", third-party framing
+    "clinical",  # Professional/medical language
+    "minimized",  # Hedged, softened ("not that I would, but...")
+    "adversarial",  # Jailbreak attempts, encoded content
 ]
 
 # Severity scale (how bad)
@@ -633,7 +632,7 @@ class EvaluateResponse(BaseModel):
     crisis_resources: Optional[List[CrisisResource]] = None
     """Crisis resources for user's region (v0 format)."""
 
-    resources: Optional[dict] = None
+    resources: Optional[Dict[str, Any]] = None
     """Crisis resources with 'why' explanations (v1 format). Contains primary and secondary keys."""
 
     widget_url: Optional[str] = None
@@ -842,8 +841,10 @@ def calculate_speaker_severity(risks: List[Risk]) -> Severity:
     For v1 responses (no subject_confidence), all self-risks are included.
     """
     speaker_risks = [
-        r for r in risks
-        if r.subject == "self" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+        r
+        for r in risks
+        if r.subject == "self"
+        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
     ]
 
     if not speaker_risks:
@@ -865,8 +866,10 @@ def calculate_speaker_imminence(risks: List[Risk]) -> Imminence:
     For v1 responses (no subject_confidence), all self-risks are included.
     """
     speaker_risks = [
-        r for r in risks
-        if r.subject == "self" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+        r
+        for r in risks
+        if r.subject == "self"
+        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
     ]
 
     if not speaker_risks:
@@ -888,7 +891,8 @@ def has_third_party_risk(risks: List[Risk]) -> bool:
     For v1 responses (no subject_confidence), all other-risks are included.
     """
     return any(
-        r.subject == "other" and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
+        r.subject == "other"
+        and (r.subject_confidence if r.subject_confidence is not None else 1.0) > 0.5
         for r in risks
     )
 

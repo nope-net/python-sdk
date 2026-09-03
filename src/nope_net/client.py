@@ -5,7 +5,7 @@ Main client for interacting with the NOPE API.
 """
 
 import warnings
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 import httpx
 
@@ -29,7 +29,6 @@ from .types import (
     OversightConversation,
     OversightIngestConfig,
     OversightIngestResponse,
-    OversightMessage,
     ResourceByIdResponse,
     ResourcesConfig,
     ResourcesCountriesResponse,
@@ -41,13 +40,22 @@ from .types import (
 )
 
 
+def _user_agent() -> str:
+    """Build the User-Agent header from the single package version."""
+    # Imported inside the function: nope_net/__init__.py imports this module, so a
+    # module-level import here would be circular at package load time.
+    from . import __version__
+
+    return f"nope-python/{__version__}"
+
+
 class NopeClient:
     """
     Client for the NOPE safety API.
 
     Example:
         ```python
-        from nope import NopeClient
+        from nope_net import NopeClient
 
         client = NopeClient(api_key="nope_live_...")
         result = client.evaluate(
@@ -68,6 +76,7 @@ class NopeClient:
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
         demo: bool = False,
+        transport: Optional[httpx.BaseTransport] = None,
     ):
         """
         Initialize the NOPE client.
@@ -79,6 +88,8 @@ class NopeClient:
             timeout: Request timeout in seconds. Defaults to 30.
             demo: Use demo/try endpoints that don't require authentication.
                   These are rate-limited but useful for testing and evaluation.
+            transport: An httpx transport to route requests through. Tests pass an
+                       ``httpx.MockTransport`` here instead of patching the module.
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
@@ -87,7 +98,7 @@ class NopeClient:
 
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "nope-python/0.1.0",
+            "User-Agent": _user_agent(),
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -96,12 +107,13 @@ class NopeClient:
             base_url=self.base_url,
             timeout=self.timeout,
             headers=headers,
+            transport=transport,
         )
 
     def __enter__(self) -> "NopeClient":
         return self
 
-    def __exit__(self, *args) -> None:
+    def __exit__(self, *args: object) -> None:
         self.close()
 
     def close(self) -> None:
@@ -111,9 +123,9 @@ class NopeClient:
     def evaluate(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
-        config: Optional[Union[EvaluateConfig, dict]] = None,
+        config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
         user_context: Optional[str] = None,
         proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
@@ -154,7 +166,8 @@ class NopeClient:
             if result.speaker_severity in ("high", "critical"):
                 print("High risk detected")
                 if result.resources and result.resources.get("primary"):
-                    print(f"  {result.resources['primary']['name']}: {result.resources['primary']['phone']}")
+                    primary = result.resources["primary"]
+                    print(f"  {primary['name']}: {primary['phone']}")
             ```
         """
         if messages is None and text is None:
@@ -163,7 +176,7 @@ class NopeClient:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
         # Build request payload
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if messages is not None:
             payload["messages"] = [
@@ -202,9 +215,9 @@ class NopeClient:
     def screen(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
-        config: Optional[Union[ScreenConfig, dict]] = None,
+        config: Optional[Union[ScreenConfig, Dict[str, Any]]] = None,
     ) -> ScreenResponse:
         """
         Lightweight crisis screening (legacy).
@@ -265,7 +278,7 @@ class NopeClient:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
         # Build request payload
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if messages is not None:
             payload["messages"] = [
@@ -289,7 +302,7 @@ class NopeClient:
     def ocular(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
     ) -> OcularResponse:
@@ -348,7 +361,7 @@ class NopeClient:
         if messages is not None and text is not None:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
         if messages is not None:
             payload["messages"] = [
                 m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
@@ -364,8 +377,8 @@ class NopeClient:
     def oversight_analyze(
         self,
         *,
-        conversation: Union[OversightConversation, dict],
-        config: Optional[Union[OversightAnalyzeConfig, dict]] = None,
+        conversation: Union[OversightConversation, Dict[str, Any]],
+        config: Optional[Union[OversightAnalyzeConfig, Dict[str, Any]]] = None,
     ) -> OversightAnalyzeResponse:
         """
         Analyze a single conversation for harmful AI behaviors.
@@ -420,7 +433,7 @@ class NopeClient:
                 raise ValueError('"conversation.messages" cannot be empty')
 
         # Build request payload
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if isinstance(conversation, dict):
             payload["conversation"] = conversation
@@ -442,9 +455,9 @@ class NopeClient:
     def oversight_ingest(
         self,
         *,
-        conversations: List[Union[OversightConversation, dict]],
+        conversations: List[Union[OversightConversation, Dict[str, Any]]],
         webhook_url: Optional[str] = None,
-        config: Optional[Union[OversightIngestConfig, dict]] = None,
+        config: Optional[Union[OversightIngestConfig, Dict[str, Any]]] = None,
     ) -> OversightIngestResponse:
         """
         Ingest multiple conversations for batch analysis with database storage.
@@ -456,7 +469,8 @@ class NopeClient:
         Oversight feature enabled.
 
         Args:
-            conversations: List of conversations to analyze (max 100). Each must have a conversation_id.
+            conversations: List of conversations to analyze (max 100). Each must have a
+                conversation_id.
             webhook_url: Optional URL to notify when ingestion completes.
             config: Configuration options (model).
 
@@ -502,23 +516,27 @@ class NopeClient:
             raise ValueError(f"Too many conversations: {len(conversations)}. Maximum allowed: 100")
 
         # Validate each conversation
-        conv_list = []
+        conv_list: List[Dict[str, Any]] = []
         for i, conv in enumerate(conversations):
             if isinstance(conv, dict):
                 if "conversation_id" not in conv:
                     raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
                 if "messages" not in conv or not conv["messages"]:
-                    raise ValueError(f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"')
+                    raise ValueError(
+                        f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"'
+                    )
                 conv_list.append(conv)
             else:
                 if not conv.conversation_id:
                     raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
                 if not conv.messages:
-                    raise ValueError(f'Conversation "{conv.conversation_id}" must have non-empty "messages"')
+                    raise ValueError(
+                        f'Conversation "{conv.conversation_id}" must have non-empty "messages"'
+                    )
                 conv_list.append(conv.model_dump(exclude_none=True))
 
         # Build request payload
-        payload: dict = {"conversations": conv_list}
+        payload: Dict[str, Any] = {"conversations": conv_list}
 
         if webhook_url is not None:
             payload["webhook_url"] = webhook_url
@@ -542,7 +560,7 @@ class NopeClient:
         self,
         *,
         country: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesResponse:
         """
         Get crisis resources for a country.
@@ -578,7 +596,7 @@ class NopeClient:
             ```
         """
         # Build query params
-        params: dict = {"country": country.upper()}
+        params: Dict[str, Any] = {"country": country.upper()}
 
         if config is not None:
             if isinstance(config, dict):
@@ -605,7 +623,7 @@ class NopeClient:
         *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesSmartResponse:
         """
         Get AI-ranked crisis resources based on a semantic query.
@@ -639,7 +657,7 @@ class NopeClient:
             ```
         """
         # Build query params
-        params: dict = {"country": country.upper(), "query": query}
+        params: Dict[str, Any] = {"country": country.upper(), "query": query}
 
         if config is not None:
             if isinstance(config, dict):
@@ -704,7 +722,7 @@ class NopeClient:
         if not query:
             raise ValueError("'query' is required")
 
-        params: dict = {"query": query}
+        params: Dict[str, Any] = {"query": query}
         if country:
             params["country"] = country.upper()
         if limit is not None:
@@ -800,7 +818,7 @@ class NopeClient:
         self,
         *,
         country: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesResponse:
         """
         Get crisis resources for a country.
@@ -823,7 +841,7 @@ class NopeClient:
             stacklevel=2,
         )
         # Build query params
-        params: dict = {"country": country.upper()}
+        params: Dict[str, Any] = {"country": country.upper()}
 
         if config is not None:
             if isinstance(config, dict):
@@ -849,7 +867,7 @@ class NopeClient:
         *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesSmartResponse:
         """
         Get AI-ranked crisis resources based on a semantic query.
@@ -872,7 +890,7 @@ class NopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
-        params: dict = {"country": country.upper(), "query": query}
+        params: Dict[str, Any] = {"country": country.upper(), "query": query}
 
         if config is not None:
             if isinstance(config, dict):
@@ -941,8 +959,8 @@ class NopeClient:
         self,
         method: str,
         path: str,
-        **kwargs,
-    ) -> dict:
+        **kwargs: Any,
+    ) -> Any:
         """
         Make an HTTP request to the API.
 
@@ -981,7 +999,7 @@ class NopeClient:
 
         return self._handle_response(response)
 
-    def _handle_response(self, response: httpx.Response) -> dict:
+    def _handle_response(self, response: httpx.Response) -> Any:
         """
         Handle API response, raising appropriate errors for non-2xx status codes.
         """
@@ -1007,6 +1025,7 @@ class NopeClient:
             # Check if this is a feature access error
             try:
                 import json
+
                 error_data = json.loads(response_body)
                 if error_data.get("feature"):
                     raise NopeFeatureError(
@@ -1051,7 +1070,7 @@ class AsyncNopeClient:
 
     Example:
         ```python
-        from nope import AsyncNopeClient
+        from nope_net import AsyncNopeClient
 
         async with AsyncNopeClient(api_key="nope_live_...") as client:
             result = await client.evaluate(
@@ -1072,6 +1091,7 @@ class AsyncNopeClient:
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
         demo: bool = False,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
     ):
         """
         Initialize the async NOPE client.
@@ -1081,6 +1101,7 @@ class AsyncNopeClient:
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
             demo: Use demo/try endpoints that don't require authentication.
+            transport: An httpx async transport to route requests through (tests).
         """
         self.api_key = api_key
         self.base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
@@ -1089,7 +1110,7 @@ class AsyncNopeClient:
 
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "nope-python/0.1.0",
+            "User-Agent": _user_agent(),
         }
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -1098,12 +1119,13 @@ class AsyncNopeClient:
             base_url=self.base_url,
             timeout=self.timeout,
             headers=headers,
+            transport=transport,
         )
 
     async def __aenter__(self) -> "AsyncNopeClient":
         return self
 
-    async def __aexit__(self, *args) -> None:
+    async def __aexit__(self, *args: object) -> None:
         await self.close()
 
     async def close(self) -> None:
@@ -1113,9 +1135,9 @@ class AsyncNopeClient:
     async def evaluate(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
-        config: Optional[Union[EvaluateConfig, dict]] = None,
+        config: Optional[Union[EvaluateConfig, Dict[str, Any]]] = None,
         user_context: Optional[str] = None,
         proposed_response: Optional[str] = None,
     ) -> EvaluateResponse:
@@ -1129,7 +1151,7 @@ class AsyncNopeClient:
         if messages is not None and text is not None:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if messages is not None:
             payload["messages"] = [
@@ -1167,9 +1189,9 @@ class AsyncNopeClient:
     async def screen(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
-        config: Optional[Union[ScreenConfig, dict]] = None,
+        config: Optional[Union[ScreenConfig, Dict[str, Any]]] = None,
     ) -> ScreenResponse:
         """
         Lightweight crisis screening (legacy).
@@ -1195,7 +1217,7 @@ class AsyncNopeClient:
         if messages is not None and text is not None:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if messages is not None:
             payload["messages"] = [
@@ -1219,7 +1241,7 @@ class AsyncNopeClient:
     async def ocular(
         self,
         *,
-        messages: Optional[List[Union[Message, dict]]] = None,
+        messages: Optional[List[Union[Message, Dict[str, Any]]]] = None,
         text: Optional[str] = None,
         thoroughness: Optional[Literal["fast", "auto", "thorough"]] = None,
     ) -> OcularResponse:
@@ -1233,7 +1255,7 @@ class AsyncNopeClient:
         if messages is not None and text is not None:
             raise ValueError("Only one of 'messages' or 'text' can be provided, not both")
 
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
         if messages is not None:
             payload["messages"] = [
                 m if isinstance(m, dict) else m.model_dump(exclude_none=True) for m in messages
@@ -1249,8 +1271,8 @@ class AsyncNopeClient:
     async def oversight_analyze(
         self,
         *,
-        conversation: Union[OversightConversation, dict],
-        config: Optional[Union[OversightAnalyzeConfig, dict]] = None,
+        conversation: Union[OversightConversation, Dict[str, Any]],
+        config: Optional[Union[OversightAnalyzeConfig, Dict[str, Any]]] = None,
     ) -> OversightAnalyzeResponse:
         """
         Analyze a single conversation for harmful AI behaviors.
@@ -1270,7 +1292,7 @@ class AsyncNopeClient:
                 raise ValueError('"conversation.messages" cannot be empty')
 
         # Build request payload
-        payload: dict = {}
+        payload: Dict[str, Any] = {}
 
         if isinstance(conversation, dict):
             payload["conversation"] = conversation
@@ -1292,9 +1314,9 @@ class AsyncNopeClient:
     async def oversight_ingest(
         self,
         *,
-        conversations: List[Union[OversightConversation, dict]],
+        conversations: List[Union[OversightConversation, Dict[str, Any]]],
         webhook_url: Optional[str] = None,
-        config: Optional[Union[OversightIngestConfig, dict]] = None,
+        config: Optional[Union[OversightIngestConfig, Dict[str, Any]]] = None,
     ) -> OversightIngestResponse:
         """
         Ingest multiple conversations for batch analysis with database storage.
@@ -1311,23 +1333,27 @@ class AsyncNopeClient:
             raise ValueError(f"Too many conversations: {len(conversations)}. Maximum allowed: 100")
 
         # Validate each conversation
-        conv_list = []
+        conv_list: List[Dict[str, Any]] = []
         for i, conv in enumerate(conversations):
             if isinstance(conv, dict):
                 if "conversation_id" not in conv:
                     raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
                 if "messages" not in conv or not conv["messages"]:
-                    raise ValueError(f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"')
+                    raise ValueError(
+                        f'Conversation "{conv["conversation_id"]}" must have non-empty "messages"'
+                    )
                 conv_list.append(conv)
             else:
                 if not conv.conversation_id:
                     raise ValueError(f'Conversation at index {i} must have a "conversation_id"')
                 if not conv.messages:
-                    raise ValueError(f'Conversation "{conv.conversation_id}" must have non-empty "messages"')
+                    raise ValueError(
+                        f'Conversation "{conv.conversation_id}" must have non-empty "messages"'
+                    )
                 conv_list.append(conv.model_dump(exclude_none=True))
 
         # Build request payload
-        payload: dict = {"conversations": conv_list}
+        payload: Dict[str, Any] = {"conversations": conv_list}
 
         if webhook_url is not None:
             payload["webhook_url"] = webhook_url
@@ -1351,14 +1377,14 @@ class AsyncNopeClient:
         self,
         *,
         country: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesResponse:
         """
         Get crisis resources for a country.
 
         See NopeClient.signpost for full documentation.
         """
-        params: dict = {"country": country.upper()}
+        params: Dict[str, Any] = {"country": country.upper()}
 
         if config is not None:
             if isinstance(config, dict):
@@ -1384,14 +1410,14 @@ class AsyncNopeClient:
         *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesSmartResponse:
         """
         Get AI-ranked crisis resources based on a semantic query.
 
         See NopeClient.signpost_smart for full documentation.
         """
-        params: dict = {"country": country.upper(), "query": query}
+        params: Dict[str, Any] = {"country": country.upper(), "query": query}
 
         if config is not None:
             if isinstance(config, dict):
@@ -1427,7 +1453,7 @@ class AsyncNopeClient:
         if not query:
             raise ValueError("'query' is required")
 
-        params: dict = {"query": query}
+        params: Dict[str, Any] = {"query": query}
         if country:
             params["country"] = country.upper()
         if limit is not None:
@@ -1476,7 +1502,7 @@ class AsyncNopeClient:
         self,
         *,
         country: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesResponse:
         """
         Get crisis resources for a country.
@@ -1489,7 +1515,7 @@ class AsyncNopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
-        params: dict = {"country": country.upper()}
+        params: Dict[str, Any] = {"country": country.upper()}
 
         if config is not None:
             if isinstance(config, dict):
@@ -1515,7 +1541,7 @@ class AsyncNopeClient:
         *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, dict]] = None,
+        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
     ) -> ResourcesSmartResponse:
         """
         Get AI-ranked crisis resources based on a semantic query.
@@ -1528,7 +1554,7 @@ class AsyncNopeClient:
             DeprecationWarning,
             stacklevel=2,
         )
-        params: dict = {"country": country.upper(), "query": query}
+        params: Dict[str, Any] = {"country": country.upper(), "query": query}
 
         if config is not None:
             if isinstance(config, dict):
@@ -1584,8 +1610,8 @@ class AsyncNopeClient:
         self,
         method: str,
         path: str,
-        **kwargs,
-    ) -> dict:
+        **kwargs: Any,
+    ) -> Any:
         """Make an async HTTP request to the API."""
         try:
             response = await self._client.request(method, path, **kwargs)
@@ -1607,7 +1633,7 @@ class AsyncNopeClient:
 
         return self._handle_response(response)
 
-    def _handle_response(self, response: httpx.Response) -> dict:
+    def _handle_response(self, response: httpx.Response) -> Any:
         """Handle API response."""
         if response.is_success:
             return response.json()
@@ -1630,6 +1656,7 @@ class AsyncNopeClient:
             # Check if this is a feature access error
             try:
                 import json
+
                 error_data = json.loads(response_body)
                 if error_data.get("feature"):
                     raise NopeFeatureError(

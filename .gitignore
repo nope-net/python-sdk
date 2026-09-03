@@ -34,3 +34,6 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Scratch files (agent/operator temp work)
+___*
