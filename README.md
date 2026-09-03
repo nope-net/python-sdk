@@ -209,6 +209,11 @@ In demo mode the call returns `OversightDemoAnalyzeResponse` with `mode`
 Batch ingest stores results for the dashboard and cross-session tracking. It
 accepts up to 300 conversations per call, bills $0.10 each before analysis,
 and returns when processing has finished (`status` is `complete` or `failed`).
+The request body is capped at 512 KB, so a batch near the count limit must
+consist of short conversations. `webhook_url` is a legacy per-request callback:
+the API POSTs an unsigned `ingestion_complete` JSON summary there when the batch
+completes. The signed `oversight.ingestion.complete` event is delivered to
+webhooks registered with `client.webhooks`.
 
 ```python
 result = client.oversight_ingest(

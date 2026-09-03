@@ -459,8 +459,13 @@ class NopeClient:
 
         Args:
             conversations: Conversations (at most 300), each with a ``conversation_id``
-                and non-empty ``messages``.
-            webhook_url: URL to notify with an ``oversight.ingestion.complete`` event.
+                and non-empty ``messages``. The request body is capped at 512 KB, so a
+                batch near the count limit must consist of short conversations.
+            webhook_url: Legacy per-request callback. The API POSTs an unsigned
+                ``{event: 'ingestion_complete', timestamp, ingestion_id,
+                conversations_processed, errors_count, high_concern_count}`` here when
+                the batch completes. The signed ``oversight.ingestion.complete`` event
+                goes to webhooks registered with ``client.webhooks``.
             config: ``model``.
 
         Returns:
@@ -470,7 +475,7 @@ class NopeClient:
             ValueError: Demo mode, empty list, more than 300 conversations, or a
                 conversation without ``conversation_id``/``messages``.
             NopeFeatureError: Oversight is not enabled for this account.
-            NopeInsufficientBalanceError: Balance cannot cover 300 mills per conversation.
+            NopeInsufficientBalanceError: Balance cannot cover 100 mills per conversation.
 
         Example:
             ```python
