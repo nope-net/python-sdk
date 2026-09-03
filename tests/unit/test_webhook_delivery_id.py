@@ -57,7 +57,7 @@ def test_verify_request_without_delivery_header() -> None:
     assert verified.payload.event_id == fx["payload"]["event_id"]
 
 
-def test_live_fixture_delivery_id_equals_payload_event_id() -> None:
+def test_live_fixture_delivery_id_is_distinct_from_payload_event_id() -> None:
     """The API sends the payload's event_id as X-NOPE-Delivery-ID (signature.ts)."""
     for event in ("evaluate.alert", "oversight.alert", "oversight.ingestion.complete", "test.ping"):
         fx = load_fixture(f"webhooks/{event}.json")
@@ -65,7 +65,7 @@ def test_live_fixture_delivery_id_equals_payload_event_id() -> None:
             fx["body"], fx["headers"], fx["secret"], max_age_seconds=0
         )
         assert verified.delivery_id == fx["headers"]["x-nope-delivery-id"]
-        assert verified.delivery_id == verified.payload.event_id
+        assert verified.delivery_id != verified.payload.event_id
 
 
 def test_event_id_only_construction_keeps_working() -> None:

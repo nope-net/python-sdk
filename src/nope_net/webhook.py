@@ -349,8 +349,9 @@ class VerifiedWebhook:
 
     ``delivery_id`` is the ``X-NOPE-Delivery-ID`` header. ``event_id`` on this
     object is a deprecated alias of it and carries the same value; the
-    payload's own id is ``payload.event_id``. The API sends the payload's
-    ``event_id`` as the delivery id, so on the live wire the two match.
+    payload's own id is ``payload.event_id``. The API sends the stored
+    delivery's id in the header, a different value from ``payload.event_id``,
+    repeated on each retry of the same delivery.
     """
 
     payload: WebhookPayloadUnion

@@ -7,7 +7,7 @@
     "x-nope-signature": "sha256=7eba1bcf4b0c58c8ac356a9d09b7887001558ee0717ddb7c71c7cb3697abbe23",
     "x-nope-timestamp": "1788396900",
     "x-nope-event": "oversight.alert",
-    "x-nope-delivery-id": "evt_00000000000000000000000000000002",
+    "x-nope-delivery-id": "dlv_00000000000000000000000000000002",
     "x-nope-webhook-id": "wh_fixture_0001",
     "user-agent": "NOPE-Webhooks/1.0"
   },
