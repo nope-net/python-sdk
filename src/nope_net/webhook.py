@@ -214,21 +214,23 @@ class TestPingPayload(WebhookPayloadBase):
     message: str
 
 
-WebhookPayload = Annotated[
-    Union[
-        EvaluateAlertPayload,
-        OversightAlertPayload,
-        OversightIngestionCompletePayload,
-        TestPingPayload,
-    ],
-    Field(discriminator="event"),
+WebhookPayloadUnion = Union[
+    EvaluateAlertPayload,
+    OversightAlertPayload,
+    OversightIngestionCompletePayload,
+    TestPingPayload,
 ]
-"""Discriminated union of the four events, keyed on ``event``."""
+"""Plain union of the four payload models: what :meth:`Webhook.verify` returns
+and :attr:`VerifiedWebhook.payload` holds. Branch with ``isinstance`` or on
+``.event``."""
 
-_PAYLOAD_ADAPTER: TypeAdapter[Any] = TypeAdapter(WebhookPayload)
+WebhookPayload = Annotated[WebhookPayloadUnion, Field(discriminator="event")]
+"""The same union with pydantic's ``event`` discriminator, for validation."""
+
+_PAYLOAD_ADAPTER: TypeAdapter[WebhookPayloadUnion] = TypeAdapter(WebhookPayload)
 
 
-def parse_webhook_payload(data: Dict[str, Any]) -> Any:
+def parse_webhook_payload(data: Dict[str, Any]) -> WebhookPayloadUnion:
     """Validate a decoded body into the matching payload model.
 
     Raises ``pydantic.ValidationError`` (a ``ValueError``) for an unknown
@@ -343,19 +345,34 @@ class WebhookSignatureError(Exception):
 
 @dataclass(frozen=True)
 class VerifiedWebhook:
-    """Result of :meth:`Webhook.verify_request`."""
+    """Result of :meth:`Webhook.verify_request`.
 
-    payload: Any
-    """One of the four payload models (``WebhookPayload``)."""
+    ``delivery_id`` is the ``X-NOPE-Delivery-ID`` header. ``event_id`` on this
+    object is a deprecated alias of it and carries the same value; the
+    payload's own id is ``payload.event_id``. The API sends the payload's
+    ``event_id`` as the delivery id, so on the live wire the two match.
+    """
+
+    payload: WebhookPayloadUnion
+    """One of the four payload models (``WebhookPayloadUnion``)."""
 
     event: str
     """Event type, from ``X-NOPE-Event`` (falls back to the payload's ``event``)."""
 
     event_id: Optional[str]
-    """``X-NOPE-Delivery-ID``; use it to de-duplicate redeliveries."""
+    """Deprecated: the ``X-NOPE-Delivery-ID`` header under an older name. Read
+    ``delivery_id`` instead; for the payload's own id read ``payload.event_id``."""
 
     webhook_id: Optional[str]
     """``X-NOPE-Webhook-ID``: which webhook configuration sent this."""
+
+    delivery_id: Optional[str] = None
+    """``X-NOPE-Delivery-ID``; use it to de-duplicate redeliveries."""
+
+    def __post_init__(self) -> None:
+        # A 4.0.0-style construction passes only event_id; mirror it.
+        if self.delivery_id is None and self.event_id is not None:
+            object.__setattr__(self, "delivery_id", self.event_id)
 
 
 # =============================================================================
@@ -393,7 +410,7 @@ class Webhook:
         secret: str,
         *,
         max_age_seconds: int = 300,
-    ) -> Any:
+    ) -> WebhookPayloadUnion:
         """
         Verify a delivery and parse its payload.
 
@@ -467,7 +484,8 @@ class Webhook:
 
         Returns:
             :class:`VerifiedWebhook` with the parsed ``payload``, ``event``,
-            ``event_id`` (delivery ID) and ``webhook_id``.
+            ``delivery_id`` (``X-NOPE-Delivery-ID``; ``event_id`` is a deprecated
+            alias of it) and ``webhook_id``.
         """
         lowered = {str(k).lower(): v for k, v in headers.items()}
         payload = Webhook.verify(
@@ -477,11 +495,13 @@ class Webhook:
             secret,
             max_age_seconds=max_age_seconds,
         )
+        delivery_id = lowered.get("x-nope-delivery-id")
         return VerifiedWebhook(
             payload=payload,
             event=lowered.get("x-nope-event") or payload.event,
-            event_id=lowered.get("x-nope-delivery-id"),
+            event_id=delivery_id,
             webhook_id=lowered.get("x-nope-webhook-id"),
+            delivery_id=delivery_id,
         )
 
     @staticmethod

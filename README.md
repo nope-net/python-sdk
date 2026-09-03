@@ -363,21 +363,24 @@ def handle_nope_webhook(body: bytes, headers):
 
     event = verified.payload
     if isinstance(event, EvaluateAlertPayload):
-        print(verified.event_id, event.risk_summary.overall_severity, event.domains[0].domain)
+        print(verified.delivery_id, event.risk_summary.overall_severity, event.domains[0].domain)
     elif isinstance(event, OversightAlertPayload):
-        print(verified.event_id, event.concern, [b.code for b in event.behaviors])
+        print(verified.delivery_id, event.concern, [b.code for b in event.behaviors])
     elif isinstance(event, OversightIngestionCompletePayload):
-        print(verified.event_id, event.ingestion_id, event.conversations_processed)
+        print(verified.delivery_id, event.ingestion_id, event.conversations_processed)
     elif isinstance(event, TestPingPayload):
-        print(verified.event_id, event.message)
+        print(verified.delivery_id, event.message)
     return {"status": "ok"}, 200
 ```
 
 `verify_request` reads the headers case-insensitively and returns the parsed
-payload plus `event`, `event_id` (the delivery id, for de-duplication) and
-`webhook_id`. Deliveries older than 300 seconds are rejected; pass
-`max_age_seconds=0` to disable that check. `Webhook.verify(payload, signature,
-timestamp, secret)` is the lower-level form. An unknown event fails with
+payload plus `event`, `delivery_id` (the `X-NOPE-Delivery-ID` header, for
+de-duplication) and `webhook_id`. `event_id` on that result is a deprecated
+alias of `delivery_id`; the payload's own id is `payload.event_id`. Deliveries
+older than 300 seconds are rejected; pass `max_age_seconds=0` to disable that
+check. `Webhook.verify(payload, signature, timestamp, secret)` is the
+lower-level form and returns the payload alone, typed as `WebhookPayloadUnion`
+(one of the four models). An unknown event fails with
 `pydantic.ValidationError` after the signature has passed.
 
 Sign test payloads the way the API does:
