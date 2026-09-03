@@ -4,6 +4,50 @@ All notable changes to the `nope-net` package. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 4.0.1 - 2026-09-03
+
+Patch release from the 4.0.0 newcomer report. No public signature is
+changed or removed.
+
+### Added
+
+- `NopeError.body`: the response parsed into a dict when it was a JSON
+  object, else `None`. `response_body` stays the raw text. Every error now
+  has `details` (`{}` outside `NopeValidationError`), so `err.details` never
+  raises `AttributeError`.
+- `VerifiedWebhook.delivery_id`, the `X-NOPE-Delivery-ID` header. `event_id`
+  on that object keeps the same value and is deprecated in favour of
+  `delivery_id`; the payload's own id stays `payload.event_id`.
+- `WebhookPayloadUnion`, the plain union of the four payload models.
+  `Webhook.verify()` and `parse_webhook_payload()` return it instead of
+  `Any`, and `VerifiedWebhook.payload` is typed with it.
+- `DetectCountryResponse` shows `detected` in its repr and str.
+- README paragraphs on client-side errors and `code` presence, the Ocular
+  per-turn contract (0-based turn indices, `trajectory_stride` default 3,
+  `signals_by_axis` keys, the two indexings inside `trajectory_shape`, no
+  shape on the demo route), third-party risk on `text=` input, and
+  `SignpostResponse.primary`/`secondary`.
+
+### Fixed
+
+- Client-side validation and demo-mode refusals raise `NopeValidationError`
+  (`status_code` `None`; `code` `invalid_request` or `not_available_in_demo`)
+  instead of a bare `ValueError`. The class now also inherits from
+  `ValueError`, so `except ValueError` keeps working and the README's
+  `except NopeValidationError` ladder catches them.
+- `messages` on `evaluate()`, `screen()` and `ocular()` is typed
+  `Optional[Sequence[Union[Message, Mapping[str, Any]]]]`, and the Oversight
+  `conversation` and `conversations` parameters accept mappings and
+  sequences. `mypy --strict` rejected `list[dict[str, str]]`, `list[Message]`
+  and tuples before (`list` is invariant). Tuples and read-only mappings reach
+  the wire as JSON arrays and objects. `mypy src tests/typing` is the gate.
+- Docstrings and the README describe current API behaviour instead of
+  internal ticket references: the demo evaluate route reads
+  `config.country`, database-backed resources carry `id` on every route,
+  `bot_context` reaches the Oversight analysis prompt, and trajectory roles
+  are `user` or `assistant`. The `screen()` docstring names the 2027-01-01
+  sunset the runtime warning already carried.
+
 ## 4.0.0 - 2026-09-03
 
 Realigns the SDK with the API at commit 73c477c. Every v1 response model is now

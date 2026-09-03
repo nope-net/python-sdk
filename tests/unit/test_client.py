@@ -55,7 +55,7 @@ class TestRequestHeaders:
         await client.close()
 
         assert api.last_request.headers["user-agent"] == f"nope-python/{__version__}"
-        assert __version__ == "4.0.0"
+        assert __version__ == "4.0.1"
 
     async def test_bearer_auth_header(self, api: FakeApi, make: ClientFactory) -> None:
         api.add("GET", "/v1/signpost/countries", json_body=load_fixture("signpost/countries.json"))
