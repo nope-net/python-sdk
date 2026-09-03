@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from ._generated.oversight_taxonomy import OversightBehaviorCategory, OversightBehaviorCode
+
 # =============================================================================
 # Core enums / literals
 # =============================================================================
@@ -679,7 +681,7 @@ class ResourcesConfig(BaseModel):
 
 
 # =============================================================================
-# Oversight Types (for /v1/oversight/* endpoints)
+# Oversight types (/v1/oversight/*)
 # =============================================================================
 
 # Concern level for AI behavior analysis
@@ -696,8 +698,11 @@ HumanIndicatorType = Literal[
     "distress_markers", "acquiescence", "disengagement", "escalation", "pushback"
 ]
 
-# Analysis strategy
+# Analysis strategy: one pass, or sliding windows for long conversations
 OversightAnalysisStrategy = Literal["single", "sliding"]
+
+# Analysis mode: full (default) or fast screening
+OversightAnalysisMode = Literal["full", "fast"]
 
 
 class OversightMessage(BaseModel):
@@ -762,6 +767,10 @@ class OversightConversationMetadata(BaseModel):
     tags: Optional[List[str]] = None
     """Customer-defined tags for categorization."""
 
+    bot_context: Optional[str] = None
+    """Free-form description of the bot or persona. The ``bot_context`` argument
+    of ``oversight_analyze`` is merged here server-side."""
+
 
 class OversightConversation(BaseModel):
     """A conversation to analyze with Oversight."""
@@ -769,13 +778,67 @@ class OversightConversation(BaseModel):
     model_config = {"extra": "allow"}
 
     conversation_id: Optional[str] = None
-    """Unique identifier for the conversation."""
+    """Unique identifier for the conversation (required for ingest)."""
 
     messages: List[OversightMessage]
     """Messages in the conversation."""
 
     metadata: Optional[OversightConversationMetadata] = None
     """Optional metadata about the conversation."""
+
+
+class OversightBehaviorFilter(BaseModel):
+    """Request-side filter on which behaviours the result includes.
+
+    Filtering happens after analysis, so the model still sees the full taxonomy.
+    ``enabled`` and ``disabled`` are exclusive when both are non-empty.
+    """
+
+    enabled: Optional[List[OversightBehaviorCode]] = None
+    """Only include these behaviour codes (allowlist)."""
+
+    disabled: Optional[List[OversightBehaviorCode]] = None
+    """Exclude these behaviour codes (blocklist)."""
+
+    min_severity: Optional[OversightSeverity] = None
+    """Only include behaviours at or above this severity."""
+
+    categories: Optional[List[OversightBehaviorCategory]] = None
+    """Only include behaviours from these categories."""
+
+
+class OversightAppliedFilter(BaseModel):
+    """The filter the API applied, echoed on the result as ``filter_applied``.
+
+    Codes are plain strings here so a taxonomy addition on the API never
+    breaks parsing.
+    """
+
+    model_config = {"extra": "allow"}
+
+    enabled: Optional[List[str]] = None
+    disabled: Optional[List[str]] = None
+    min_severity: Optional[OversightSeverity] = None
+    categories: Optional[List[str]] = None
+
+
+class OversightAnalyzeConfig(BaseModel):
+    """Configuration for an Oversight analyze request."""
+
+    strategy: Optional[OversightAnalysisStrategy] = None
+    """Force a strategy. Auto-selected from conversation length when omitted
+    (sliding at 50 messages or more). Ignored by the demo route."""
+
+    mode: Optional[OversightAnalysisMode] = None
+    """``full`` (default) or ``fast``. Fast mode uses a quicker model, returns no
+    ``summary``/``pattern_assessment``, an empty ``turn_analysis`` and the constant
+    trajectory ``stable``."""
+
+    include_raw_xml: Optional[bool] = None
+    """Include the raw model XML in the response (debugging)."""
+
+    model: Optional[str] = None
+    """Custom model to use. Ignored by the demo route."""
 
 
 class DetectedBehavior(BaseModel):
@@ -790,7 +853,7 @@ class DetectedBehavior(BaseModel):
     """Severity of this behavior instance."""
 
     turn_number: int
-    """Turn number where behavior was detected (0-indexed)."""
+    """Assistant turn where the behavior was detected (1-based)."""
 
     evidence: str
     """Evidence quote from the conversation."""
@@ -811,7 +874,10 @@ class AggregatedBehavior(BaseModel):
     """Highest severity across instances."""
 
     turn_count: int
-    """Number of turns where this behavior appeared."""
+    """Number of turns where this behavior appeared (always 1 in fast mode)."""
+
+    recommendation: Optional[str] = None
+    """Actionable recommendation for correcting this behavior."""
 
 
 class TurnAnalysis(BaseModel):
@@ -820,10 +886,10 @@ class TurnAnalysis(BaseModel):
     model_config = {"extra": "allow"}
 
     turn_number: int
-    """Turn number (0-indexed)."""
+    """Assistant turn number (1-based)."""
 
-    role: Literal["assistant"] = "assistant"
-    """Role of this turn (always 'assistant' for analysis)."""
+    role: Literal["assistant"]
+    """Role of this turn (always 'assistant')."""
 
     content_summary: str
     """Brief summary of turn content."""
@@ -832,7 +898,7 @@ class TurnAnalysis(BaseModel):
     """Behaviors detected in this turn."""
 
     missed_intervention: bool
-    """Whether AI missed an opportunity to intervene."""
+    """Whether the AI missed an opportunity to intervene."""
 
 
 class HumanIndicator(BaseModel):
@@ -847,11 +913,78 @@ class HumanIndicator(BaseModel):
     """What was observed."""
 
     turns: List[int]
-    """Turn numbers where this was observed."""
+    """Turn numbers where this was observed (1-based)."""
+
+
+class OversightMessageRange(BaseModel):
+    """Exact 0-indexed message slice a window analysed."""
+
+    model_config = {"extra": "allow"}
+
+    start_index: int
+    end_index_exclusive: int
+
+
+class OversightConversationTurnRange(BaseModel):
+    """1-indexed conversation turn range a window represents."""
+
+    model_config = {"extra": "allow"}
+
+    start_turn: int
+    end_turn: int
+
+
+class OversightWindow(BaseModel):
+    """Which messages a window covered.
+
+    ``start_turn``/``end_turn`` are the legacy names (message indexes, end
+    exclusive); prefer ``message_range`` and ``conversation_turn_range``.
+    """
+
+    model_config = {"extra": "allow"}
+
+    start_turn: int
+    end_turn: int
+    message_range: Optional[OversightMessageRange] = None
+    conversation_turn_range: Optional[OversightConversationTurnRange] = None
+
+
+class WindowAnalysis(BaseModel):
+    """Analysis of one window of a sliding-strategy run."""
+
+    model_config = {"extra": "allow"}
+
+    window: OversightWindow
+    concern: ConcernLevel
+    behaviors: List[DetectedBehavior]
+    turn_analysis: List[TurnAnalysis]
+    human_indicators: List[HumanIndicator]
+    summary: str
+
+
+class InflectionPoint(BaseModel):
+    """A point where the concern level changed between consecutive windows."""
+
+    model_config = {"extra": "allow"}
+
+    turn: int
+    """Conversation turn (1-based) where the change occurred."""
+
+    concern_before: ConcernLevel
+    concern_after: ConcernLevel
+    trigger_behaviors: List[str]
+    """Behaviors that appeared in the new window."""
 
 
 class OversightAnalysisResult(BaseModel):
-    """Result from Oversight analysis."""
+    """Result from Oversight analysis.
+
+    Fast mode (``config.mode = "fast"``) omits ``summary`` and
+    ``pattern_assessment``, returns ``turn_analysis`` and ``human_indicators``
+    empty, ``conversation_summary`` as ``""`` and ``trajectory`` as the constant
+    ``stable``. The sliding strategy adds ``windows``, ``concern_progression``,
+    ``peak_concern`` and ``final_concern``.
+    """
 
     model_config = {"extra": "allow", "protected_namespaces": ()}
 
@@ -862,34 +995,61 @@ class OversightAnalysisResult(BaseModel):
     """When analysis was performed (ISO 8601)."""
 
     conversation_summary: str
-    """Brief summary of the conversation."""
+    """Brief summary of the conversation (empty in fast mode)."""
 
     overall_concern: ConcernLevel
     """Overall concern level."""
 
     trajectory: Trajectory
-    """Trajectory of concern within the conversation."""
+    """Trajectory of concern within the conversation (always ``stable`` in fast mode)."""
 
-    summary: str
-    """Human-readable summary of findings."""
+    summary: Optional[str] = None
+    """Human-readable summary of findings. Absent in fast mode."""
 
     turn_analysis: List[TurnAnalysis]
-    """Turn-by-turn analysis (assistant turns only)."""
+    """Turn-by-turn analysis (assistant turns only; empty in fast mode)."""
 
     human_indicators: List[HumanIndicator]
     """Human response indicators observed."""
 
-    pattern_assessment: str
-    """Pattern assessment narrative."""
+    pattern_assessment: Optional[str] = None
+    """Pattern assessment narrative. Absent in fast mode."""
 
     detected_behaviors: List[AggregatedBehavior]
     """Aggregated behaviors (deduplicated across turns)."""
 
-    model_used: str
+    model_used: Optional[str] = None
     """Model used for analysis."""
 
     latency_ms: Optional[int] = None
     """Analysis latency in milliseconds."""
+
+    mode_used: Optional[OversightAnalysisMode] = None
+    """Which analysis mode ran."""
+
+    filter_applied: Optional[OversightAppliedFilter] = None
+    """The behaviour filter that was applied, if any."""
+
+    windows: Optional[List[WindowAnalysis]] = None
+    """Per-window analyses (sliding strategy)."""
+
+    concern_progression: Optional[List[ConcernLevel]] = None
+    """Concern level per window, in order (sliding strategy)."""
+
+    peak_concern: Optional[ConcernLevel] = None
+    """Highest window concern (sliding strategy)."""
+
+    final_concern: Optional[ConcernLevel] = None
+    """Last window concern (sliding strategy)."""
+
+    inflection_points: Optional[List[InflectionPoint]] = None
+    """Where concern changed between windows."""
+
+    context_for_next_window: Optional[str] = None
+    """Context summary carried between windows."""
+
+    narrative_summary: Optional[str] = None
+    """Narrative summary for cross-session aggregation."""
 
     prompt_tokens: Optional[int] = None
     """Prompt tokens used."""
@@ -901,57 +1061,58 @@ class OversightAnalysisResult(BaseModel):
     """Raw XML output (only if requested)."""
 
 
-class OversightAnalyzeConfig(BaseModel):
-    """Configuration for Oversight analyze request."""
-
-    strategy: Optional[OversightAnalysisStrategy] = None
-    """Force a specific analysis strategy. If None, auto-selects based on conversation length."""
-
-    include_raw_xml: Optional[bool] = None
-    """Include raw XML in response (for debugging)."""
-
-    model: Optional[str] = None
-    """Custom model to use."""
-
-
 class OversightAnalyzeResponse(BaseModel):
-    """Response from /v1/oversight/analyze."""
+    """Response from ``POST /v1/oversight/analyze`` (authenticated)."""
 
     model_config = {"extra": "allow"}
 
     result: OversightAnalysisResult
     """Analysis result."""
 
-    strategy: Optional[OversightAnalysisStrategy] = None
-    """Which strategy was used (authenticated endpoint)."""
+    strategy: OversightAnalysisStrategy
+    """Which strategy was used."""
 
-    strategy_reason: Optional[str] = None
-    """Why this strategy was chosen (authenticated endpoint)."""
+    strategy_reason: str
+    """Why this strategy was chosen."""
 
-    mode: Optional[Literal["single", "windowed"]] = None
-    """Analysis mode (demo endpoint)."""
 
-    try_endpoint: Optional[bool] = None
-    """Whether this came from try endpoint."""
+class OversightDemoAnalyzeResponse(BaseModel):
+    """Response from ``POST /v1/try/oversight/analyze`` (demo mode).
+
+    The demo route ignores ``config.strategy`` and ``config.model``, keeps only
+    ``role`` and ``content`` of each message, and caps input at 20 messages of
+    10,000 characters.
+    """
+
+    model_config = {"extra": "allow"}
+
+    mode: Literal["single", "fast"]
+    """``fast`` when ``config.mode`` was fast, else ``single``."""
+
+    result: OversightAnalysisResult
+    """Analysis result."""
+
+    try_endpoint: Literal[True]
+    """Always true on the demo route."""
 
 
 class OversightIngestConfig(BaseModel):
-    """Configuration for Oversight ingest request."""
+    """Configuration for an Oversight ingest request."""
 
     model: Optional[str] = None
     """Custom model to use."""
 
 
 class TruncationWarning(BaseModel):
-    """Truncation warning from ingest."""
+    """What ingest changed about a conversation before analysis."""
 
     model_config = {"extra": "allow"}
 
-    type: str
+    type: Literal["message_scaffolded", "message_truncated", "conversation_truncated"]
     """Warning type."""
 
-    message: str
-    """Warning message."""
+    details: str
+    """What was modified."""
 
 
 class OversightIngestConversationResult(BaseModel):
@@ -969,7 +1130,7 @@ class OversightIngestConversationResult(BaseModel):
     """Number of behaviors detected."""
 
     truncation_warnings: Optional[List[TruncationWarning]] = None
-    """Truncation warnings if conversation was modified."""
+    """Truncation warnings if the conversation was modified."""
 
 
 class OversightIngestError(BaseModel):
@@ -985,7 +1146,13 @@ class OversightIngestError(BaseModel):
 
 
 class OversightIngestResponse(BaseModel):
-    """Response from /v1/oversight/ingest."""
+    """Response from ``POST /v1/oversight/ingest``.
+
+    Ingest is synchronous today: ``status`` is ``complete`` or ``failed`` when
+    the call returns, ``estimated_completion`` is never set and there is no
+    polling route. The ``queued``/``processing`` values are kept for forward
+    compatibility.
+    """
 
     model_config = {"extra": "allow"}
 
@@ -1002,16 +1169,16 @@ class OversightIngestResponse(BaseModel):
     """Number of conversations successfully processed."""
 
     estimated_completion: Optional[str] = None
-    """Estimated completion time (ISO 8601)."""
+    """Reserved; not set by the current synchronous route."""
 
     dashboard_url: str
     """URL to view results in dashboard."""
 
     results: Optional[List[OversightIngestConversationResult]] = None
-    """Per-conversation results (if complete)."""
+    """Per-conversation results (present when at least one succeeded)."""
 
     errors: Optional[List[OversightIngestError]] = None
-    """Per-conversation errors (if any)."""
+    """Per-conversation errors (present when at least one failed)."""
 
 
 # =============================================================================

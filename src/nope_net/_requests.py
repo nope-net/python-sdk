@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from pydantic import BaseModel
 
 MAX_EVALUATE_MESSAGES = 100
+MAX_INGEST_CONVERSATIONS = 300
+OVERSIGHT_SEVERITIES = ("low", "medium", "high", "critical")
 
 JsonDict = Dict[str, Any]
 
@@ -108,3 +110,93 @@ def build_screen_request(
     if config is not None:
         payload["config"] = dump(config)
     return "/v0/screen", payload
+
+
+# =============================================================================
+# Oversight
+# =============================================================================
+
+
+def _validate_oversight_conversation(
+    conversation: JsonDict, *, index: Optional[int] = None
+) -> None:
+    label = "conversation" if index is None else f"Conversation at index {index}"
+    messages = conversation.get("messages")
+    if messages is None:
+        raise ValueError(f'"{label}.messages" is required')
+    if not isinstance(messages, list):
+        raise ValueError(f'"{label}.messages" must be a list')
+    if len(messages) == 0:
+        raise ValueError(f'"{label}.messages" cannot be empty')
+    for position, message in enumerate(messages):
+        role = message.get("role") if isinstance(message, dict) else None
+        if role not in ("user", "assistant", "system"):
+            raise ValueError(
+                f"{label}: message {position} role must be 'user', 'assistant' or 'system'"
+            )
+
+
+def _validate_behavior_filter(behaviors: JsonDict) -> None:
+    if behaviors.get("enabled") and behaviors.get("disabled"):
+        raise ValueError('"behaviors.enabled" and "behaviors.disabled" are mutually exclusive')
+    min_severity = behaviors.get("min_severity")
+    if min_severity is not None and min_severity not in OVERSIGHT_SEVERITIES:
+        raise ValueError(
+            '"behaviors.min_severity" must be one of: ' + ", ".join(OVERSIGHT_SEVERITIES)
+        )
+
+
+def build_oversight_analyze_request(
+    *,
+    conversation: Union[BaseModel, JsonDict],
+    bot_context: Optional[str],
+    config: Optional[Union[BaseModel, JsonDict]],
+    behaviors: Optional[Union[BaseModel, JsonDict]],
+    demo: bool,
+) -> Tuple[str, JsonDict]:
+    """Return ``(path, body)`` for ``oversight_analyze``."""
+    conversation_dict = dump(conversation)
+    _validate_oversight_conversation(conversation_dict)
+    payload: JsonDict = {"conversation": conversation_dict}
+    if bot_context is not None:
+        payload["bot_context"] = bot_context
+    if config is not None:
+        payload["config"] = dump(config)
+    if behaviors is not None:
+        behaviors_dict = dump(behaviors)
+        _validate_behavior_filter(behaviors_dict)
+        payload["behaviors"] = behaviors_dict
+    path = "/v1/try/oversight/analyze" if demo else "/v1/oversight/analyze"
+    return path, payload
+
+
+def build_oversight_ingest_request(
+    *,
+    conversations: Sequence[Union[BaseModel, JsonDict]],
+    webhook_url: Optional[str],
+    config: Optional[Union[BaseModel, JsonDict]],
+) -> Tuple[str, JsonDict]:
+    """Return ``(path, body)`` for ``oversight_ingest`` (client cap 300 conversations)."""
+    if not conversations:
+        raise ValueError('"conversations" cannot be empty')
+    if len(conversations) > MAX_INGEST_CONVERSATIONS:
+        raise ValueError(
+            f"Too many conversations: {len(conversations)}. "
+            f"Maximum allowed: {MAX_INGEST_CONVERSATIONS}"
+        )
+    conversation_list: List[JsonDict] = []
+    for index, conversation in enumerate(conversations):
+        data = dump(conversation)
+        if not data.get("conversation_id"):
+            raise ValueError(f'Conversation at index {index} must have a "conversation_id"')
+        if not data.get("messages"):
+            raise ValueError(
+                f'Conversation "{data["conversation_id"]}" must have non-empty "messages"'
+            )
+        conversation_list.append(data)
+    payload: JsonDict = {"conversations": conversation_list}
+    if webhook_url is not None:
+        payload["webhook_url"] = webhook_url
+    if config is not None:
+        payload["config"] = dump(config)
+    return "/v1/oversight/ingest", payload
