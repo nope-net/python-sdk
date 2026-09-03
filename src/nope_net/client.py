@@ -11,6 +11,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Literal, Optional, Unio
 
 import httpx
 
+from ._generated.signpost_enums import Population, ServiceScope
 from ._http import (
     DEFAULT_MAX_RETRIES,
     ResponseMeta,
@@ -27,6 +28,9 @@ from ._requests import (
     build_oversight_analyze_request,
     build_oversight_ingest_request,
     build_screen_request,
+    build_signpost_params,
+    build_signpost_search_params,
+    build_signpost_smart_params,
 )
 from .types import (
     DetectCountryResponse,
@@ -42,15 +46,29 @@ from .types import (
     OversightDemoAnalyzeResponse,
     OversightIngestConfig,
     OversightIngestResponse,
-    ResourceByIdResponse,
-    ResourcesConfig,
-    ResourcesCountriesResponse,
-    ResourcesResponse,
-    ResourcesSmartResponse,
     ScreenConfig,
     ScreenResponse,
+    SignpostByIdResponse,
+    SignpostConfig,
+    SignpostCountriesResponse,
+    SignpostResponse,
     SignpostSearchResponse,
+    SignpostSmartConfig,
+    SignpostSmartResponse,
 )
+
+RESOURCES_SUNSET = "2027-01-01"
+
+
+def _warn_deprecated_resources(name: str, replacement: str) -> None:
+    """One warning text for the four /v1/resources/* wrappers, shared by both clients."""
+    warnings.warn(
+        f"{name}() is deprecated (sunset {RESOURCES_SUNSET}; use {replacement}()). "
+        "It calls the deprecated /v1/resources route, which is served with "
+        "Deprecation and Sunset headers until then.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def _user_agent() -> str:
@@ -472,130 +490,102 @@ class NopeClient:
         return OversightIngestResponse.model_validate(response)
 
     # =========================================================================
-    # Signpost Methods (canonical crisis resources endpoints)
+    # Signpost (crisis resources)
     # =========================================================================
 
     def signpost(
         self,
-        *,
         country: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesResponse:
+        *,
+        config: Optional[Union[SignpostConfig, Dict[str, Any]]] = None,
+        scopes: Optional[List[ServiceScope]] = None,
+        populations: Optional[List[Population]] = None,
+        subdivisions: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        urgent: Optional[bool] = None,
+    ) -> SignpostResponse:
         """
-        Get crisis resources for a country.
+        Crisis resources for a country (free, requires an API key, no LLM).
 
-        This is the basic lookup endpoint (free, no LLM). For AI-ranked results,
-        use `signpost_smart()` instead.
+        Filters may be passed at the top level or under ``config``; a top-level
+        value wins. For LLM-ranked picks use :meth:`signpost_smart`. Not
+        available in demo mode.
 
         Args:
-            country: ISO country code (e.g., "US", "GB").
-            config: Optional filtering configuration (scopes, populations, limit, urgent).
+            country: ISO 3166-1 alpha-2 code (e.g. "US", "GB").
+            config: ``SignpostConfig`` or dict with the same keys as below.
+            scopes: Service scopes from ``nope_net.SERVICE_SCOPES`` (e.g. "suicide",
+                "domestic_violence"). With scopes the response also carries
+                ``primary`` and ``secondary``.
+            populations: Populations from ``nope_net.POPULATIONS`` (e.g. "youth").
+            subdivisions: ISO 3166-2 codes within the country (e.g. "GB-SCT").
+            limit: Maximum resources (the API clamps to 10).
+            urgent: Only 24/7 resources.
 
         Returns:
-            ResourcesResponse with crisis resources for the country.
+            SignpostResponse with ``resources`` (and ``primary``/``secondary`` when
+            scopes were given). Branch on ``resource.type`` to tell a line from a
+            service.
 
         Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
+            ValueError: Demo mode.
+            NopeValidationError: Unknown scope or population (``details.invalid_scopes``).
 
         Example:
             ```python
-            result = client.signpost(country="US")
+            result = client.signpost("US", scopes=["suicide"], urgent=True)
             for resource in result.resources:
                 print(f"{resource.name}: {resource.phone}")
-
-            # With filtering
-            result = client.signpost(
-                country="US",
-                config={"scopes": ["suicide_prevention"], "urgent": True}
-            )
             ```
         """
-        # Build query params
-        params: Dict[str, Any] = {"country": country.upper()}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-            if cfg.get("urgent"):
-                params["urgent"] = "true"
-
-        # Make request
+        if self.demo:
+            raise ValueError("signpost() is not available in demo mode. Use an API key.")
+        params = build_signpost_params(
+            country=country,
+            config=config,
+            scopes=scopes,
+            populations=populations,
+            subdivisions=subdivisions,
+            limit=limit,
+            urgent=urgent,
+        )
         response = self._request("GET", "/v1/signpost", params=params)
-
-        return ResourcesResponse.model_validate(response)
+        return SignpostResponse.model_validate(response)
 
     def signpost_smart(
         self,
-        *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesSmartResponse:
+        *,
+        config: Optional[Union[SignpostSmartConfig, Dict[str, Any]]] = None,
+    ) -> SignpostSmartResponse:
         """
-        Get AI-ranked crisis resources based on a semantic query.
+        LLM-ranked crisis resources for a situation ($0.001 per call).
 
-        Uses LLM ranking to find the most relevant crisis resources. Costs $0.001 per call.
+        Ranks the country's pool against ``query`` and returns up to 5 picks,
+        each with a one-line ``why``. In demo mode routes to
+        ``/v1/try/signpost/smart`` (free, rate-limited per IP).
 
         Args:
-            country: ISO country code (e.g., "US", "GB").
-            query: Natural language query (max 500 chars).
-            config: Optional filtering configuration (scopes, populations, limit).
+            country: ISO 3166-1 alpha-2 code.
+            query: Natural-language description of the situation (max 500 chars).
+            config: ``scopes``, ``populations``, ``limit`` (up to 5).
 
         Returns:
-            ResourcesSmartResponse with resources ranked by relevance.
-
-        Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
+            SignpostSmartResponse with ``ranked[]`` of ``{rank, resource, why}``;
+            ``message`` is set when the country pool is empty.
 
         Example:
             ```python
-            result = client.signpost_smart(
-                country="US",
-                query="teen struggling with eating disorder"
-            )
-            for ranked in result.ranked:
-                print(f"{ranked.resource.name} (score: {ranked.score})")
-                print(f"  {ranked.reasoning}")
+            result = client.signpost_smart("US", "teen struggling with eating disorder")
+            for item in result.ranked:
+                print(f"{item.rank}. {item.resource.name}: {item.why}")
             ```
         """
-        # Build query params
-        params: Dict[str, Any] = {"country": country.upper(), "query": query}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-
-        # Make request - uses demo endpoint if demo mode
+        params = build_signpost_smart_params(country=country, query=query, config=config)
         endpoint = "/v1/try/signpost/smart" if self.demo else "/v1/signpost/smart"
         response = self._request("GET", endpoint, params=params)
-
-        return ResourcesSmartResponse.model_validate(response)
+        return SignpostSmartResponse.model_validate(response)
 
     def signpost_search(
         self,
@@ -606,273 +596,131 @@ class NopeClient:
         threshold: Optional[float] = None,
     ) -> SignpostSearchResponse:
         """
-        Semantic search across all crisis resources using vector embeddings.
+        Semantic search across the whole resource directory (free, requires an API key).
 
-        Unlike ``signpost_smart()`` (which uses LLM ranking and is
-        country-scoped), this uses pre-computed embeddings for fast semantic
-        search across the entire resource database. Free; requires an API key.
+        Uses pre-computed embeddings rather than LLM ranking, and is not
+        country-scoped unless ``country`` is given. Rows come back in the
+        directory's own shape (:class:`SignpostSearchResult`). Not available
+        in demo mode.
 
         Args:
             query: Natural language query (max 500 chars).
-            country: Optional ISO country code to filter results.
+            country: Optional ISO country code filter.
             limit: Max results (default 10, max 50).
             threshold: Similarity threshold in [0, 1] (default 0.3).
 
-        Returns:
-            SignpostSearchResponse with results ranked by similarity.
-
-        Raises:
-            NopeAuthError: Invalid or missing API key.
-            NopeValidationError: Invalid request payload.
-            NopeRateLimitError: Rate limit exceeded.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
-
         Example:
             ```python
-            result = client.signpost_search(
-                query="lgbtq support for black community",
-                country="US",
-            )
-            for r in result.results:
-                print(f"{r.name} (similarity: {r.similarity})")
+            result = client.signpost_search(query="lgbtq youth support", country="GB")
+            for row in result.results:
+                print(f"{row.name} ({row.similarity:.2f}): {row.phone}")
             ```
         """
-        if not query:
-            raise ValueError("'query' is required")
-
-        params: Dict[str, Any] = {"query": query}
-        if country:
-            params["country"] = country.upper()
-        if limit is not None:
-            params["limit"] = str(limit)
-        if threshold is not None:
-            params["threshold"] = str(threshold)
-
+        if self.demo:
+            raise ValueError("signpost_search() is not available in demo mode. Use an API key.")
+        params = build_signpost_search_params(
+            query=query, country=country, limit=limit, threshold=threshold
+        )
         response = self._request("GET", "/v1/signpost/search", params=params)
         return SignpostSearchResponse.model_validate(response)
 
-    def signpost_by_id(self, resource_id: str) -> ResourceByIdResponse:
+    def signpost_by_id(self, resource_id: str) -> SignpostByIdResponse:
         """
-        Get a single crisis resource by its database ID.
+        One crisis resource by directory UUID (public, no key needed).
 
-        This is a public endpoint (no auth required).
-
-        Args:
-            resource_id: UUID of the resource.
-
-        Returns:
-            ResourceByIdResponse with the crisis resource.
+        Search results carry ``id``; basic and smart results gain it with API
+        fix A-6.
 
         Raises:
-            NopeValidationError: Invalid resource ID format.
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
-
-        Example:
-            ```python
-            result = client.signpost_by_id("550e8400-e29b-41d4-a716-446655440000")
-            print(f"{result.resource.name}: {result.resource.phone}")
-            ```
+            NopeValidationError: Malformed UUID.
+            NopeNotFoundError: No such resource.
         """
         response = self._request("GET", f"/v1/signpost/{resource_id}")
+        return SignpostByIdResponse.model_validate(response)
 
-        return ResourceByIdResponse.model_validate(response)
-
-    def signpost_countries(self) -> ResourcesCountriesResponse:
-        """
-        List all countries with available crisis resources.
-
-        This is a public endpoint (no auth required).
-
-        Returns:
-            ResourcesCountriesResponse with list of supported country codes.
-
-        Raises:
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
-
-        Example:
-            ```python
-            result = client.signpost_countries()
-            print(f"Supported countries: {', '.join(result.countries)}")
-            ```
-        """
+    def signpost_countries(self) -> SignpostCountriesResponse:
+        """List the countries with resources (public, no key needed)."""
         response = self._request("GET", "/v1/signpost/countries")
+        return SignpostCountriesResponse.model_validate(response)
 
-        return ResourcesCountriesResponse.model_validate(response)
-
-    def detect_country(self) -> DetectCountryResponse:
+    def detect_country(self, country_hint: Optional[str] = None) -> DetectCountryResponse:
         """
-        Detect user's country from request headers.
+        Detect the caller's country from proxy geo headers (public, no key needed).
 
-        Uses geo headers (Cloudflare, Netlify) to determine country.
-        This is a public endpoint (no auth required).
+        The route reads only headers a proxy injects (Cloudflare ``cf-ipcountry``,
+        Netlify/Vercel ``x-country``/``x-vercel-ip-country``). The direct
+        api.nope.net deployment carries none, so a direct call returns the miss
+        shape (``detected`` False) with HTTP 200. Behind such a proxy it works.
 
-        Returns:
-            DetectCountryResponse with detected country code and name.
-
-        Raises:
-            NopeServerError: Server error.
-            NopeConnectionError: Connection failed.
+        Args:
+            country_hint: Sent as ``x-country`` so the route echoes it back; useful
+                when your own edge already knows the country.
 
         Example:
             ```python
-            result = client.detect_country()
-            if result.country_code:
-                print(f"Detected: {result.country_name} ({result.country_code})")
-            else:
-                print("Could not detect country")
+            detected = client.detect_country()
+            if detected.detected:
+                print(detected.country_code, detected.subdivision_code)
             ```
         """
-        response = self._request("GET", "/v1/signpost/detect-country")
-
+        headers = {"x-country": country_hint.upper()} if country_hint else None
+        response = self._request("GET", "/v1/signpost/detect-country", headers=headers)
         return DetectCountryResponse.model_validate(response)
 
     # =========================================================================
-    # Deprecated Resources Methods (use signpost* methods instead)
+    # Deprecated /v1/resources/* twins (sunset 2027-01-01; use signpost*)
     # =========================================================================
 
     def resources(
         self,
-        *,
         country: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesResponse:
-        """
-        Get crisis resources for a country.
-
-        .. deprecated::
-            Use :meth:`signpost` instead. This method calls the deprecated
-            ``/v1/resources`` endpoint.
-
-        Args:
-            country: ISO country code (e.g., "US", "GB").
-            config: Optional filtering configuration.
-
-        Returns:
-            ResourcesResponse with crisis resources for the country.
-        """
-        warnings.warn(
-            "resources() is deprecated and will be removed in a future version. "
-            "Use signpost() instead.",
-            DeprecationWarning,
-            stacklevel=2,
+        *,
+        config: Optional[Union[SignpostConfig, Dict[str, Any]]] = None,
+        scopes: Optional[List[ServiceScope]] = None,
+        populations: Optional[List[Population]] = None,
+        subdivisions: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        urgent: Optional[bool] = None,
+    ) -> SignpostResponse:
+        """Deprecated twin of :meth:`signpost` on ``/v1/resources`` (sunset 2027-01-01)."""
+        _warn_deprecated_resources("resources", "signpost")
+        params = build_signpost_params(
+            country=country,
+            config=config,
+            scopes=scopes,
+            populations=populations,
+            subdivisions=subdivisions,
+            limit=limit,
+            urgent=urgent,
         )
-        # Build query params
-        params: Dict[str, Any] = {"country": country.upper()}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-            if cfg.get("urgent"):
-                params["urgent"] = "true"
-
         response = self._request("GET", "/v1/resources", params=params)
-
-        return ResourcesResponse.model_validate(response)
+        return SignpostResponse.model_validate(response)
 
     def resources_smart(
         self,
-        *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesSmartResponse:
-        """
-        Get AI-ranked crisis resources based on a semantic query.
-
-        .. deprecated::
-            Use :meth:`signpost_smart` instead. This method calls the deprecated
-            ``/v1/resources/smart`` endpoint.
-
-        Args:
-            country: ISO country code (e.g., "US", "GB").
-            query: Natural language query (max 500 chars).
-            config: Optional filtering configuration.
-
-        Returns:
-            ResourcesSmartResponse with resources ranked by relevance.
-        """
-        warnings.warn(
-            "resources_smart() is deprecated and will be removed in a future version. "
-            "Use signpost_smart() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        params: Dict[str, Any] = {"country": country.upper(), "query": query}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-
+        *,
+        config: Optional[Union[SignpostSmartConfig, Dict[str, Any]]] = None,
+    ) -> SignpostSmartResponse:
+        """Deprecated twin of :meth:`signpost_smart` on ``/v1/resources/smart``."""
+        _warn_deprecated_resources("resources_smart", "signpost_smart")
+        params = build_signpost_smart_params(country=country, query=query, config=config)
         endpoint = "/v1/try/resources/smart" if self.demo else "/v1/resources/smart"
         response = self._request("GET", endpoint, params=params)
+        return SignpostSmartResponse.model_validate(response)
 
-        return ResourcesSmartResponse.model_validate(response)
-
-    def resource_by_id(self, resource_id: str) -> ResourceByIdResponse:
-        """
-        Get a single crisis resource by its database ID.
-
-        .. deprecated::
-            Use :meth:`signpost_by_id` instead. This method calls the deprecated
-            ``/v1/resources/:id`` endpoint.
-
-        Args:
-            resource_id: UUID of the resource.
-
-        Returns:
-            ResourceByIdResponse with the crisis resource.
-        """
-        warnings.warn(
-            "resource_by_id() is deprecated and will be removed in a future version. "
-            "Use signpost_by_id() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    def resource_by_id(self, resource_id: str) -> SignpostByIdResponse:
+        """Deprecated twin of :meth:`signpost_by_id` on ``/v1/resources/:id``."""
+        _warn_deprecated_resources("resource_by_id", "signpost_by_id")
         response = self._request("GET", f"/v1/resources/{resource_id}")
+        return SignpostByIdResponse.model_validate(response)
 
-        return ResourceByIdResponse.model_validate(response)
-
-    def resources_countries(self) -> ResourcesCountriesResponse:
-        """
-        List all countries with available crisis resources.
-
-        .. deprecated::
-            Use :meth:`signpost_countries` instead. This method calls the deprecated
-            ``/v1/resources/countries`` endpoint.
-
-        Returns:
-            ResourcesCountriesResponse with list of supported country codes.
-        """
-        warnings.warn(
-            "resources_countries() is deprecated and will be removed in a future version. "
-            "Use signpost_countries() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    def resources_countries(self) -> SignpostCountriesResponse:
+        """Deprecated twin of :meth:`signpost_countries` on ``/v1/resources/countries``."""
+        _warn_deprecated_resources("resources_countries", "signpost_countries")
         response = self._request("GET", "/v1/resources/countries")
-
-        return ResourcesCountriesResponse.model_validate(response)
+        return SignpostCountriesResponse.model_validate(response)
 
     def _request(
         self,
@@ -1108,72 +956,53 @@ class AsyncNopeClient:
         return OversightIngestResponse.model_validate(response)
 
     # =========================================================================
-    # Signpost Methods (canonical crisis resources endpoints)
+    # Signpost (crisis resources)
     # =========================================================================
 
     async def signpost(
         self,
-        *,
         country: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesResponse:
+        *,
+        config: Optional[Union[SignpostConfig, Dict[str, Any]]] = None,
+        scopes: Optional[List[ServiceScope]] = None,
+        populations: Optional[List[Population]] = None,
+        subdivisions: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        urgent: Optional[bool] = None,
+    ) -> SignpostResponse:
         """
-        Get crisis resources for a country.
-
-        See NopeClient.signpost for full documentation.
+        Crisis resources for a country (free, requires an API key, no LLM). See NopeClient for full
+        documentation.
         """
-        params: Dict[str, Any] = {"country": country.upper()}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-            if cfg.get("urgent"):
-                params["urgent"] = "true"
-
+        if self.demo:
+            raise ValueError("signpost() is not available in demo mode. Use an API key.")
+        params = build_signpost_params(
+            country=country,
+            config=config,
+            scopes=scopes,
+            populations=populations,
+            subdivisions=subdivisions,
+            limit=limit,
+            urgent=urgent,
+        )
         response = await self._request("GET", "/v1/signpost", params=params)
-
-        return ResourcesResponse.model_validate(response)
+        return SignpostResponse.model_validate(response)
 
     async def signpost_smart(
         self,
-        *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesSmartResponse:
+        *,
+        config: Optional[Union[SignpostSmartConfig, Dict[str, Any]]] = None,
+    ) -> SignpostSmartResponse:
         """
-        Get AI-ranked crisis resources based on a semantic query.
-
-        See NopeClient.signpost_smart for full documentation.
+        LLM-ranked crisis resources for a situation ($0.001 per call). See NopeClient for full
+        documentation.
         """
-        params: Dict[str, Any] = {"country": country.upper(), "query": query}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-
+        params = build_signpost_smart_params(country=country, query=query, config=config)
         endpoint = "/v1/try/signpost/smart" if self.demo else "/v1/signpost/smart"
         response = await self._request("GET", endpoint, params=params)
-
-        return ResourcesSmartResponse.model_validate(response)
+        return SignpostSmartResponse.model_validate(response)
 
     async def signpost_search(
         self,
@@ -1184,165 +1013,93 @@ class AsyncNopeClient:
         threshold: Optional[float] = None,
     ) -> SignpostSearchResponse:
         """
-        Semantic search across all crisis resources using vector embeddings (async).
-
-        See NopeClient.signpost_search for full documentation.
+        Semantic search across the whole resource directory (free, requires an API key). See
+        NopeClient for full documentation.
         """
-        if not query:
-            raise ValueError("'query' is required")
-
-        params: Dict[str, Any] = {"query": query}
-        if country:
-            params["country"] = country.upper()
-        if limit is not None:
-            params["limit"] = str(limit)
-        if threshold is not None:
-            params["threshold"] = str(threshold)
-
+        if self.demo:
+            raise ValueError("signpost_search() is not available in demo mode. Use an API key.")
+        params = build_signpost_search_params(
+            query=query, country=country, limit=limit, threshold=threshold
+        )
         response = await self._request("GET", "/v1/signpost/search", params=params)
         return SignpostSearchResponse.model_validate(response)
 
-    async def signpost_by_id(self, resource_id: str) -> ResourceByIdResponse:
+    async def signpost_by_id(self, resource_id: str) -> SignpostByIdResponse:
         """
-        Get a single crisis resource by its database ID.
-
-        See NopeClient.signpost_by_id for full documentation.
+        One crisis resource by directory UUID (public, no key needed). See NopeClient for full
+        documentation.
         """
         response = await self._request("GET", f"/v1/signpost/{resource_id}")
+        return SignpostByIdResponse.model_validate(response)
 
-        return ResourceByIdResponse.model_validate(response)
-
-    async def signpost_countries(self) -> ResourcesCountriesResponse:
-        """
-        List all countries with available crisis resources.
-
-        See NopeClient.signpost_countries for full documentation.
-        """
+    async def signpost_countries(self) -> SignpostCountriesResponse:
+        """List the countries with resources (public, no key needed)."""
         response = await self._request("GET", "/v1/signpost/countries")
+        return SignpostCountriesResponse.model_validate(response)
 
-        return ResourcesCountriesResponse.model_validate(response)
-
-    async def detect_country(self) -> DetectCountryResponse:
+    async def detect_country(self, country_hint: Optional[str] = None) -> DetectCountryResponse:
         """
-        Detect user's country from request headers.
-
-        See NopeClient.detect_country for full documentation.
+        Detect the caller's country from proxy geo headers (public, no key needed). See NopeClient
+        for full documentation.
         """
-        response = await self._request("GET", "/v1/signpost/detect-country")
-
+        headers = {"x-country": country_hint.upper()} if country_hint else None
+        response = await self._request("GET", "/v1/signpost/detect-country", headers=headers)
         return DetectCountryResponse.model_validate(response)
 
     # =========================================================================
-    # Deprecated Resources Methods (use signpost* methods instead)
+    # Deprecated /v1/resources/* twins (sunset 2027-01-01; use signpost*)
     # =========================================================================
 
     async def resources(
         self,
-        *,
         country: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesResponse:
-        """
-        Get crisis resources for a country.
-
-        .. deprecated::
-            Use :meth:`signpost` instead.
-        """
-        warnings.warn(
-            "resources() is deprecated. Use signpost() instead.",
-            DeprecationWarning,
-            stacklevel=2,
+        *,
+        config: Optional[Union[SignpostConfig, Dict[str, Any]]] = None,
+        scopes: Optional[List[ServiceScope]] = None,
+        populations: Optional[List[Population]] = None,
+        subdivisions: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        urgent: Optional[bool] = None,
+    ) -> SignpostResponse:
+        """Deprecated twin of :meth:`signpost` on ``/v1/resources`` (sunset 2027-01-01)."""
+        _warn_deprecated_resources("resources", "signpost")
+        params = build_signpost_params(
+            country=country,
+            config=config,
+            scopes=scopes,
+            populations=populations,
+            subdivisions=subdivisions,
+            limit=limit,
+            urgent=urgent,
         )
-        params: Dict[str, Any] = {"country": country.upper()}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-            if cfg.get("urgent"):
-                params["urgent"] = "true"
-
         response = await self._request("GET", "/v1/resources", params=params)
-
-        return ResourcesResponse.model_validate(response)
+        return SignpostResponse.model_validate(response)
 
     async def resources_smart(
         self,
-        *,
         country: str,
         query: str,
-        config: Optional[Union[ResourcesConfig, Dict[str, Any]]] = None,
-    ) -> ResourcesSmartResponse:
-        """
-        Get AI-ranked crisis resources based on a semantic query.
-
-        .. deprecated::
-            Use :meth:`signpost_smart` instead.
-        """
-        warnings.warn(
-            "resources_smart() is deprecated. Use signpost_smart() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        params: Dict[str, Any] = {"country": country.upper(), "query": query}
-
-        if config is not None:
-            if isinstance(config, dict):
-                cfg = config
-            else:
-                cfg = config.model_dump(exclude_none=True)
-
-            if cfg.get("scopes"):
-                params["scopes"] = ",".join(cfg["scopes"])
-            if cfg.get("populations"):
-                params["populations"] = ",".join(cfg["populations"])
-            if cfg.get("limit") is not None:
-                params["limit"] = str(cfg["limit"])
-
+        *,
+        config: Optional[Union[SignpostSmartConfig, Dict[str, Any]]] = None,
+    ) -> SignpostSmartResponse:
+        """Deprecated twin of :meth:`signpost_smart` on ``/v1/resources/smart``."""
+        _warn_deprecated_resources("resources_smart", "signpost_smart")
+        params = build_signpost_smart_params(country=country, query=query, config=config)
         endpoint = "/v1/try/resources/smart" if self.demo else "/v1/resources/smart"
         response = await self._request("GET", endpoint, params=params)
+        return SignpostSmartResponse.model_validate(response)
 
-        return ResourcesSmartResponse.model_validate(response)
-
-    async def resource_by_id(self, resource_id: str) -> ResourceByIdResponse:
-        """
-        Get a single crisis resource by its database ID.
-
-        .. deprecated::
-            Use :meth:`signpost_by_id` instead.
-        """
-        warnings.warn(
-            "resource_by_id() is deprecated. Use signpost_by_id() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    async def resource_by_id(self, resource_id: str) -> SignpostByIdResponse:
+        """Deprecated twin of :meth:`signpost_by_id` on ``/v1/resources/:id``."""
+        _warn_deprecated_resources("resource_by_id", "signpost_by_id")
         response = await self._request("GET", f"/v1/resources/{resource_id}")
+        return SignpostByIdResponse.model_validate(response)
 
-        return ResourceByIdResponse.model_validate(response)
-
-    async def resources_countries(self) -> ResourcesCountriesResponse:
-        """
-        List all countries with available crisis resources.
-
-        .. deprecated::
-            Use :meth:`signpost_countries` instead.
-        """
-        warnings.warn(
-            "resources_countries() is deprecated. Use signpost_countries() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+    async def resources_countries(self) -> SignpostCountriesResponse:
+        """Deprecated twin of :meth:`signpost_countries` on ``/v1/resources/countries``."""
+        _warn_deprecated_resources("resources_countries", "signpost_countries")
         response = await self._request("GET", "/v1/resources/countries")
-
-        return ResourcesCountriesResponse.model_validate(response)
+        return SignpostCountriesResponse.model_validate(response)
 
     async def _request(
         self,

@@ -28,6 +28,7 @@ from ._generated.oversight_taxonomy import (
     OversightBehaviorCategory,
     OversightBehaviorCode,
 )
+from ._generated.signpost_enums import POPULATIONS, SERVICE_SCOPES, Population, ServiceScope
 from ._http import BalanceMeta, RateLimitMeta, ResponseMeta
 from .client import AsyncNopeClient, NopeClient
 from .errors import (
@@ -117,9 +118,16 @@ from .types import (
     ScreenRisk,
     ScreenRiskSubject,
     Severity,
+    SignpostByIdResponse,
+    SignpostConfig,
+    SignpostCountriesResponse,
+    SignpostResponse,
+    SignpostSearchContact,
     SignpostSearchResponse,
     SignpostSearchResult,
     SignpostSearchTiming,
+    SignpostSmartConfig,
+    SignpostSmartResponse,
     Trajectory,
     TruncationWarning,
     TurnAnalysis,
@@ -192,17 +200,29 @@ __all__ = [
     "ScreenRecommendedReply",
     "ScreenCrisisResources",
     "ScreenDebugInfo",
-    # Resources / signpost
+    # Signpost
+    "ServiceScope",
+    "Population",
+    "SERVICE_SCOPES",
+    "POPULATIONS",
     "RankedResource",
+    "SignpostConfig",
+    "SignpostSmartConfig",
+    "SignpostResponse",
+    "SignpostSmartResponse",
+    "SignpostByIdResponse",
+    "SignpostCountriesResponse",
+    "DetectCountryResponse",
+    "SignpostSearchContact",
+    "SignpostSearchResult",
+    "SignpostSearchTiming",
+    "SignpostSearchResponse",
+    # Deprecated /v1/resources/* aliases
     "ResourcesConfig",
     "ResourcesResponse",
     "ResourcesSmartResponse",
     "ResourceByIdResponse",
     "ResourcesCountriesResponse",
-    "DetectCountryResponse",
-    "SignpostSearchResult",
-    "SignpostSearchTiming",
-    "SignpostSearchResponse",
     # Ocular
     "OcularResponse",
     "OcularDemoResponse",

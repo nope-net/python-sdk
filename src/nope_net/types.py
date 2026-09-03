@@ -8,11 +8,12 @@ contract tests under ``tests/contract/`` pin every shape to a live capture.
 Risks separate WHO is at risk (``subject``) from WHAT kind of harm (``type``).
 """
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 from ._generated.oversight_taxonomy import OversightBehaviorCategory, OversightBehaviorCode
+from ._generated.signpost_enums import Population, ServiceScope
 
 # =============================================================================
 # Core enums / literals
@@ -564,12 +565,12 @@ def has_third_party_risk(risks: List[Risk]) -> bool:
 
 
 # =============================================================================
-# Resources Types (for /v1/resources/* endpoints)
+# Signpost types (/v1/signpost/*; /v1/resources/* is the deprecated twin)
 # =============================================================================
 
 
 class RankedResource(BaseModel):
-    """A resource with LLM-computed relevance ranking."""
+    """A resource with its LLM-computed relevance ranking."""
 
     model_config = {"extra": "allow"}
 
@@ -583,8 +584,8 @@ class RankedResource(BaseModel):
     """Rank position (1 = most relevant)."""
 
 
-class ResourcesResponse(BaseModel):
-    """Response from GET /v1/resources endpoint."""
+class SignpostResponse(BaseModel):
+    """Response from ``GET /v1/signpost``."""
 
     model_config = {"extra": "allow"}
 
@@ -592,23 +593,23 @@ class ResourcesResponse(BaseModel):
     """Country code (ISO 3166-1 alpha-2)."""
 
     resources: List[CrisisResource]
-    """List of crisis resources."""
+    """Crisis resources (the primary list when scopes were given)."""
 
     count: int
     """Number of resources returned."""
 
     primary: Optional[List[CrisisResource]] = None
-    """Primary resources matching requested scopes (when scopes provided)."""
+    """Resources matching the requested scopes (present when scopes were given)."""
 
     secondary: Optional[List[CrisisResource]] = None
-    """Secondary general resources (when scopes provided)."""
+    """General resources for the country (present when scopes were given)."""
 
     scopes_requested: Optional[List[str]] = None
-    """Scopes that were requested (when provided)."""
+    """Scopes that were requested (present when scopes were given)."""
 
 
-class ResourcesSmartResponse(BaseModel):
-    """Response from GET /v1/resources/smart endpoint."""
+class SignpostSmartResponse(BaseModel):
+    """Response from ``GET /v1/signpost/smart`` (and ``/v1/try/signpost/smart``)."""
 
     model_config = {"extra": "allow"}
 
@@ -616,10 +617,10 @@ class ResourcesSmartResponse(BaseModel):
     """Country code (ISO 3166-1 alpha-2)."""
 
     query: str
-    """The search query used."""
+    """The query used for ranking."""
 
     ranked: List[RankedResource]
-    """Resources ranked by relevance to query."""
+    """Up to 5 resources ranked by relevance to the query."""
 
     count: int
     """Number of resources returned."""
@@ -627,9 +628,15 @@ class ResourcesSmartResponse(BaseModel):
     scopes_requested: Optional[List[str]] = None
     """Scopes that were requested (when provided)."""
 
+    message: Optional[str] = None
+    """Set when the country has no resources to rank."""
 
-class ResourceByIdResponse(BaseModel):
-    """Response from GET /v1/resources/:id endpoint."""
+    try_endpoint: Optional[bool] = None
+    """True when served by the demo route."""
+
+
+class SignpostByIdResponse(BaseModel):
+    """Response from ``GET /v1/signpost/:id``."""
 
     model_config = {"extra": "allow"}
 
@@ -637,47 +644,94 @@ class ResourceByIdResponse(BaseModel):
     """The requested crisis resource."""
 
 
-class ResourcesCountriesResponse(BaseModel):
-    """Response from GET /v1/resources/countries endpoint."""
+class SignpostCountriesResponse(BaseModel):
+    """Response from ``GET /v1/signpost/countries``."""
 
     model_config = {"extra": "allow"}
 
     countries: List[str]
-    """List of supported country codes (ISO 3166-1 alpha-2)."""
+    """Supported country codes (ISO 3166-1 alpha-2)."""
 
     count: int
     """Number of countries."""
 
 
 class DetectCountryResponse(BaseModel):
-    """Response from GET /v1/resources/detect-country endpoint."""
+    """Response from ``GET /v1/signpost/detect-country``.
+
+    The route reads the geo headers a proxy injects (``cf-ipcountry``,
+    ``x-country``, ``x-vercel-ip-country``, ``cf-region-code``, ``cf-region``).
+    A direct call to api.nope.net carries none of them and returns the miss
+    shape with HTTP 200. Key on ``country_code`` (or ``detected``);
+    ``country_name`` is empty for countries outside the API's 36-entry name map.
+    """
 
     model_config = {"extra": "allow"}
 
     country_code: str
-    """Detected country code (ISO 3166-1 alpha-2), or empty string if not detected."""
+    """Detected country code, or an empty string on a miss."""
 
     country_name: str
-    """Human-readable country name, or empty string if not detected."""
+    """Human-readable country name, or an empty string."""
+
+    subdivision_code: Optional[str] = None
+    """ISO 3166-2 subdivision (e.g. 'US-CA') when the proxy sent a region."""
+
+    subdivision_name: Optional[str] = None
+    """Human-readable region name when the proxy sent one."""
 
     error: Optional[str] = None
-    """Error message if country could not be detected."""
+    """Set on a miss."""
+
+    @property
+    def detected(self) -> bool:
+        """True when ``country_code`` is non-empty."""
+        return self.country_code != ""
 
 
-class ResourcesConfig(BaseModel):
-    """Configuration for resources request."""
+class SignpostConfig(BaseModel):
+    """Filters for the basic ``signpost`` lookup.
 
-    scopes: Optional[List[str]] = None
-    """Service scopes to filter by (e.g., 'suicide_prevention', 'domestic_violence')."""
+    Scopes and populations must come from the generated vocabularies
+    (``nope_net.SERVICE_SCOPES``, ``nope_net.POPULATIONS``); the API returns
+    400 with ``invalid_scopes`` otherwise.
+    """
 
-    populations: Optional[List[str]] = None
-    """Populations to filter by (e.g., 'youth', 'veterans', 'lgbtq')."""
+    scopes: Optional[List[ServiceScope]] = None
+    """Service scopes to filter by (e.g. 'suicide', 'domestic_violence')."""
+
+    populations: Optional[List[Population]] = None
+    """Populations to filter by (e.g. 'youth', 'veterans', 'lgbtq')."""
+
+    subdivisions: Optional[List[str]] = None
+    """ISO 3166-2 subdivisions within the country (e.g. 'GB-SCT')."""
 
     limit: Optional[int] = None
-    """Maximum number of resources to return (max 10)."""
+    """Maximum number of resources to return (the API clamps to 10)."""
 
     urgent: Optional[bool] = None
     """Only return 24/7 urgent resources."""
+
+
+class SignpostSmartConfig(BaseModel):
+    """Filters for ``signpost_smart``. The ranker returns at most 5 picks."""
+
+    scopes: Optional[List[ServiceScope]] = None
+    """Service scopes to filter the candidate pool by."""
+
+    populations: Optional[List[Population]] = None
+    """Populations to filter the candidate pool by."""
+
+    limit: Optional[int] = None
+    """Maximum picks (up to 5)."""
+
+
+# Deprecated names kept for the /v1/resources/* twins (sunset 2027-01-01).
+ResourcesConfig = SignpostConfig
+ResourcesResponse = SignpostResponse
+ResourcesSmartResponse = SignpostSmartResponse
+ResourceByIdResponse = SignpostByIdResponse
+ResourcesCountriesResponse = SignpostCountriesResponse
 
 
 # =============================================================================
@@ -1388,25 +1442,79 @@ class OcularDemoResponse(OcularResponse):
 
 
 # =============================================================================
-# Signpost Search (vector semantic search — GET /v1/signpost/search)
+# Signpost search (vector semantic search, GET /v1/signpost/search)
 # =============================================================================
 
 
-class SignpostSearchResult(CrisisResource):
+class SignpostSearchContact(BaseModel):
+    """One contact method on a search row (the directory row, not flattened)."""
+
+    model_config = {"extra": "allow"}
+
+    tier: Union[int, str]
+    """Contact tier; the directory stores it as a string today."""
+
+    type: str
+    """Contact type (phone, email, chat, sms, ...)."""
+
+    value: str
+    """Number, address or URL."""
+
+    source: Optional[str] = None
+    """Where the contact was verified."""
+
+
+class SignpostSearchResult(BaseModel):
     """A single semantic-search hit.
 
-    Carries all the flattened `CrisisResource` fields (the gateway lifts
-    contact methods to the top level and computes `open_status`) plus the
-    vector `similarity` score for this query.
+    Search returns the raw directory row (plural ``service_scopes``,
+    ``populations``, ``resource_type``, ``contacts``, explicit nulls) with the
+    tier-1 contacts flattened to top-level keys and ``type`` mirroring
+    ``resource_type``. It is a different shape from :class:`CrisisResource`
+    until API fix A-7 routes search hits through the same converter.
     """
 
     model_config = {"extra": "allow"}
 
-    id: Optional[str] = None
-    """Database UUID of the resource."""
+    id: str
+    """Directory UUID; usable with ``signpost_by_id``."""
 
-    similarity: Optional[float] = None
-    """Vector similarity to the query in [0, 1]; higher = more relevant."""
+    name: str
+    name_local: Optional[str] = None
+    country_code: str
+    subdivision_code: Optional[str] = None
+    country_codes: List[str]
+    subdivision_codes: List[str]
+    service_scopes: List[str]
+    populations: List[str]
+    description: Optional[str] = None
+    resource_type: str
+    contacts: List[SignpostSearchContact]
+    website_url: Optional[str] = None
+    is_24_7: bool
+    availability: Optional[str] = None
+    timezone: Optional[str] = None
+    opening_hours_osm: Optional[str] = None
+    hours_confidence: Optional[str] = None
+    languages: List[str]
+    similarity: float
+    """Vector similarity to the query in [0, 1]; higher is more relevant."""
+
+    phone: Optional[str] = None
+    """Flattened tier-1 phone contact."""
+
+    sms_number: Optional[str] = None
+    chat_url: Optional[str] = None
+    whatsapp_url: Optional[str] = None
+    email: Optional[str] = None
+    line_url: Optional[str] = None
+    telegram_url: Optional[str] = None
+    wechat_id: Optional[str] = None
+    type: CrisisResourceType
+    """Same value as ``resource_type``."""
+
+    open_status: OpenStatus
+    """Computed open/closed status."""
 
 
 class SignpostSearchTiming(BaseModel):
@@ -1414,18 +1522,18 @@ class SignpostSearchTiming(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    embed_ms: float = 0.0
+    embed_ms: float
     """Time spent embedding the query (ms)."""
 
-    search_ms: float = 0.0
+    search_ms: float
     """Time spent on the vector search (ms)."""
 
-    total_ms: float = 0.0
+    total_ms: float
     """Total time (embed + search) (ms)."""
 
 
 class SignpostSearchResponse(BaseModel):
-    """Response from GET /v1/signpost/search."""
+    """Response from ``GET /v1/signpost/search``."""
 
     model_config = {"extra": "allow"}
 
@@ -1435,10 +1543,10 @@ class SignpostSearchResponse(BaseModel):
     country: Optional[str] = None
     """Country filter applied, or None when unfiltered."""
 
-    results: List[SignpostSearchResult] = Field(default_factory=list)
+    results: List[SignpostSearchResult]
     """Resources ranked by semantic similarity to the query."""
 
-    count: int = 0
+    count: int
     """Number of results returned."""
 
     timing: Optional[SignpostSearchTiming] = None

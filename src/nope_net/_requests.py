@@ -249,3 +249,85 @@ def build_ocular_request(
     if agent_id is not None:
         payload["agent_id"] = agent_id
     return "/v1/ocular", payload
+
+
+# =============================================================================
+# Signpost
+# =============================================================================
+
+
+def _join(values: Optional[Sequence[str]]) -> Optional[str]:
+    if values is None:
+        return None
+    return ",".join(values)
+
+
+def build_signpost_params(
+    *,
+    country: str,
+    config: Optional[Union[BaseModel, JsonDict]],
+    scopes: Optional[Sequence[str]],
+    populations: Optional[Sequence[str]],
+    subdivisions: Optional[Sequence[str]],
+    limit: Optional[int],
+    urgent: Optional[bool],
+) -> Dict[str, str]:
+    """Query params for the basic lookup. Top-level filters win over ``config``."""
+    cfg = dump(config) if config is not None else {}
+    merged: JsonDict = {
+        "scopes": scopes if scopes is not None else cfg.get("scopes"),
+        "populations": populations if populations is not None else cfg.get("populations"),
+        "subdivisions": subdivisions if subdivisions is not None else cfg.get("subdivisions"),
+        "limit": limit if limit is not None else cfg.get("limit"),
+        "urgent": urgent if urgent is not None else cfg.get("urgent"),
+    }
+    params: Dict[str, str] = {"country": country.upper()}
+    for key in ("scopes", "populations", "subdivisions"):
+        joined = _join(merged[key])
+        if joined:
+            params[key] = joined
+    if merged["limit"] is not None:
+        params["limit"] = str(merged["limit"])
+    if merged["urgent"]:
+        params["urgent"] = "true"
+    return params
+
+
+def build_signpost_smart_params(
+    *,
+    country: str,
+    query: str,
+    config: Optional[Union[BaseModel, JsonDict]],
+) -> Dict[str, str]:
+    """Query params for the smart (LLM-ranked) lookup."""
+    if not query:
+        raise ValueError("'query' is required")
+    cfg = dump(config) if config is not None else {}
+    params: Dict[str, str] = {"country": country.upper(), "query": query}
+    for key in ("scopes", "populations"):
+        joined = _join(cfg.get(key))
+        if joined:
+            params[key] = joined
+    if cfg.get("limit") is not None:
+        params["limit"] = str(cfg["limit"])
+    return params
+
+
+def build_signpost_search_params(
+    *,
+    query: str,
+    country: Optional[str],
+    limit: Optional[int],
+    threshold: Optional[float],
+) -> Dict[str, str]:
+    """Query params for vector search."""
+    if not query:
+        raise ValueError("'query' is required")
+    params: Dict[str, str] = {"query": query}
+    if country:
+        params["country"] = country.upper()
+    if limit is not None:
+        params["limit"] = str(limit)
+    if threshold is not None:
+        params["threshold"] = str(threshold)
+    return params
