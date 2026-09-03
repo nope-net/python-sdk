@@ -3,7 +3,8 @@
 ``client.webhooks`` and ``client.billing`` are small objects bound to a client;
 they build requests here and send them through the client's shared ``_request``
 so retries, error mapping and ``last_response_meta`` behave the same as every
-other call. Neither namespace has a demo route.
+other call. ``billing.pricing`` is public and works in demo mode; nothing else
+here has a demo route.
 """
 
 import json
@@ -336,8 +337,7 @@ class BillingClient:
         )
 
     def pricing(self) -> BillingPricingResponse:
-        """Current per-endpoint pricing and top-up options (no key needed)."""
-        _demo_guard(self._client.demo, "billing.pricing")
+        """Current per-endpoint pricing and top-up options (public; works in demo mode)."""
         return BillingPricingResponse.model_validate(
             self._client._request("GET", "/v1/billing/pricing")
         )
@@ -398,7 +398,7 @@ class AsyncBillingClient:
         )
 
     async def pricing(self) -> BillingPricingResponse:
-        _demo_guard(self._client.demo, "billing.pricing")
+        """Current per-endpoint pricing and top-up options (public; works in demo mode)."""
         return BillingPricingResponse.model_validate(
             await self._client._request("GET", "/v1/billing/pricing")
         )

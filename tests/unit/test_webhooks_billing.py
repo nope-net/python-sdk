@@ -215,7 +215,6 @@ class TestWebhooksNamespace:
             ("billing.balance", ()),
             ("billing.usage", ()),
             ("billing.usage_history", ()),
-            ("billing.pricing", ()),
             ("billing.topup", (10000,)),
         ],
     )
@@ -307,6 +306,18 @@ class TestBillingNamespace:
         assert isinstance(result, BillingUsageHistoryResponse)
         assert result.records[0].metadata == {"speaker_severity": "none"}
         assert result.model_dump(mode="json", exclude_unset=True) == body
+
+    async def test_pricing_in_demo_mode(self, api: FakeApi, make: ClientFactory) -> None:
+        """The price list is public, so a demo client reads it like any other."""
+        body = load_fixture("billing/pricing.json")
+        api.add("GET", "/v1/billing/pricing", json_body=body)
+        client = make(demo=True)
+        result = await client.call("billing.pricing")
+        await client.close()
+
+        assert api.last_request.url.path == "/v1/billing/pricing"
+        assert "authorization" not in api.last_request.headers
+        assert isinstance(result, BillingPricingResponse)
 
     async def test_pricing_without_key(self, api: FakeApi, make: ClientFactory) -> None:
         body = load_fixture("billing/pricing.json")
